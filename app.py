@@ -48,15 +48,18 @@ MCF_BASELINE = 1.0                 # Aterro sanitário anaeróbio gerenciado
 OX_BASELINE = 0.1                  # Fator de oxidação para SWDS sem cobertura (não-LDC)
 PHI_BASELINE = 0.85                # Clima úmido (Application B)
 
-# Fatores de emissão para compostagem termofílica (Yang et al. 2017) – usados no script original
+# Fatores de emissão para compostagem termofílica
+# Fonte: Yang, F., Li, G., Zuo, X., & Yang, H. (2017). "Emission factors of CH₄ and N₂O during
+#        thermophilic composting of food waste." *Waste Management*, 66, 44-51.
+#        DOI: 10.1016/j.wasman.2017.04.033
 TOC = 0.436
 TN = 0.0142
-F_CH4_THERMO = 0.0060      # fração de CH4 na compostagem termofílica
-F_N2O_THERMO = 0.0196      # fração de N2O na compostagem termofílica
+F_CH4_THERMO = 0.0060      # fração de CH₄ na compostagem termofílica (t CH₄/t C orgânico)
+F_N2O_THERMO = 0.0196      # fração de N₂O na compostagem termofílica (t N₂O/t N)
 
 # Fatores de emissão padrão para compostagem em leiras (TOOL13, v02.0, seção 6.3)
-EF_CH4_WINDROW_DEFAULT = 0.002     # t CH4 / t resíduo úmido
-EF_N2O_WINDROW_DEFAULT = 0.0005    # t N2O / t resíduo úmido
+EF_CH4_WINDROW_DEFAULT = 0.002     # t CH₄ / t resíduo úmido
+EF_N2O_WINDROW_DEFAULT = 0.0005    # t N₂O / t resíduo úmido
 
 # CLASSE PARA CÁLCULO DE EMISSÕES DE GEE
 
@@ -64,8 +67,8 @@ class GHGEmissionCalculator:
     """
     Calcula emissões de CH₄ e N₂O para:
     - Aterro sanitário (baseline, método FOD do IPCC) – calibrado para Ribeirão Preto.
-    - Compostagem termofílica (fatores de Yang et al. 2017).
-    - Compostagem convencional em leiras (windrow) – conforme TOOL13.
+    - Compostagem termofílica (Yang et al., 2017 – fatores baseados em TOC/TN).
+    - Compostagem convencional em leiras (windrow) – conforme TOOL13 (UNFCCC, 2017).
 
     Referências normativas:
     - Baseline: A6.4-AMT-003 (v01.0) "Emissions from solid waste disposal sites"
@@ -80,7 +83,7 @@ class GHGEmissionCalculator:
         self.OX = OX_BASELINE
         self.Ri = 0.0                         # fração recuperada (default 0)
         
-        # Parâmetros para compostagem termofílica (baseados em TOC/TN)
+        # Parâmetros para compostagem termofílica (Yang et al. 2017)
         self.TOC = TOC
         self.TN = TN
         self.f_CH4_thermo = F_CH4_THERMO
@@ -180,7 +183,10 @@ class GHGEmissionCalculator:
         return ch4_emissions, n2o_emissions
 
     def calculate_thermophilic_emissions(self, waste_kg_day, moisture_fraction, years=20):
-        """Emissões da compostagem termofílica (Yang et al. 2017)."""
+        """
+        Emissões da compostagem termofílica.
+        Fonte: Yang, F., Li, G., Zuo, X., & Yang, H. (2017). Waste Management, 66, 44-51.
+        """
         days = years * 365
         dry_fraction = 1 - moisture_fraction
         ch4_per_batch = (waste_kg_day * self.TOC * self.f_CH4_thermo * (16/12) * dry_fraction)
@@ -196,7 +202,10 @@ class GHGEmissionCalculator:
         return ch4_emissions, n2o_emissions
 
     def calculate_windrow_emissions(self, waste_kg_day, moisture_fraction, years=20):
-        """Emissões da compostagem em leiras (TOOL13, fatores padrão)."""
+        """
+        Emissões da compostagem em leiras (windrow).
+        Fonte: TOOL13, v02.0 (UNFCCC, 2017) – fatores padrão da seção 6.3.
+        """
         days = years * 365
         total_waste_kg = waste_kg_day * days
         total_waste_t = total_waste_kg / 1000.0
@@ -412,7 +421,7 @@ inicializar_session_state()
 st.title("Simulador de Emissões de tCO₂eq e Cálculo de Créditos de Carbono com Análise de Sensibilidade Global")
 st.markdown("""
 Esta ferramenta projeta os Créditos de Carbono ao calcular as emissões de gases de efeito estufa para **duas tecnologias de compostagem**:
-- **Compostagem termofílica** (Yang et al. 2017)
+- **Compostagem termofílica** (Yang et al., 2017 – fatores baseados em TOC/TN)
 - **Compostagem em leiras** (fatores padrão TOOL13, UNFCCC 2017)
 em comparação com o **aterro sanitário** calibrado para a realidade de Ribeirão Preto (aterro CGR Guatapará com captura de biogás).
 """)
@@ -611,11 +620,12 @@ if st.session_state.get('run_simulation', False):
         - k = {formatar_br(k_ano)} ano⁻¹, T = {formatar_br(T)} °C, DOC = {formatar_br(DOC)}, Umidade = {formatar_br(umidade_valor)}%
         - Resíduos/dia: {formatar_br(residuos_kg_dia)} kg → total {formatar_br(residuos_kg_dia * 365 * anos_simulacao / 1000)} t
         - **Aterro CGR Guatapará:** MCF = 1,0; captura de metano = {CAPTURE_FRACTION_BASELINE*100:.0f}%; φ = {PHI_BASELINE}
-        - **Compostagem termofílica:** fatores Yang et al. 2017 (CH₄ = 0,0060; N₂O = 0,0196)
-        - **Compostagem em leiras:** fatores TOOL13 (CH₄ = 0,002; N₂O = 0,0005)
+        - **Compostagem termofílica:** Yang, F., et al. (2017). *Waste Management*, 66, 44-51.
+          Fatores: CH₄ = 0,0060 t CH₄/t C orgânico; N₂O = 0,0196 t N₂O/t N.
+        - **Compostagem em leiras:** TOOL13, v02.0 (UNFCCC, 2017). Fatores padrão: CH₄ = 0,002 t CH₄/t resíduo úmido; N₂O = 0,0005 t N₂O/t resíduo úmido.
         """)
 
-        # Comparativo financeiro e de emissões evitadas
+        # Comparativo financeiro
         total_evitado_thermo = results['thermophilic']['avoided_co2eq_t']
         total_evitado_windrow = results['windrow']['avoided_co2eq_t']
 
@@ -655,7 +665,7 @@ if st.session_state.get('run_simulation', False):
         param_values = sample(problem, n_samples, seed=50)
         gwp20_ch4, gwp20_n2o = gwps["Otimista (GWP-20)"]
 
-        st.subheader("🎯 Análise de Sensibilidade - Termofílica")
+        st.subheader("🎯 Análise de Sensibilidade - Termofílica (Yang et al. 2017)")
         results_thermo = Parallel(n_jobs=1)(delayed(executar_simulacao_thermo_sobol)(params, gwp20_ch4, gwp20_n2o) for params in param_values)
         Si_thermo = analyze(problem, np.array(results_thermo), print_to_console=False)
         df_sens_thermo = pd.DataFrame({'Parâmetro': problem['names'], 'S1': Si_thermo['S1'], 'ST': Si_thermo['ST']})
@@ -693,7 +703,7 @@ if st.session_state.get('run_simulation', False):
         mc_windrow = np.array(mc_windrow)
         diff = mc_thermo - mc_windrow
 
-        # Estatísticas de comparação (exatamente como no original entre vermi e termo)
+        # Estatísticas de comparação
         shapiro_stat, shapiro_p = stats.shapiro(diff)
         t_stat, t_p = stats.ttest_rel(mc_thermo, mc_windrow)
         w_stat, w_p = stats.wilcoxon(mc_thermo, mc_windrow)
@@ -702,9 +712,9 @@ if st.session_state.get('run_simulation', False):
         st.write(f"**Teste t pareado:** t = {t_stat:.5f}, p = {t_p:.5f}")
         st.write(f"**Teste de Wilcoxon:** estatística = {w_stat:.5f}, p = {w_p:.5f}")
 
-        # Tabela resumo
+        # Tabela resumo Monte Carlo
         stats_list = []
-        for nome, arr in [("Termofílica", mc_thermo), ("Leiras", mc_windrow)]:
+        for nome, arr in [("Termofílica (Yang et al.)", mc_thermo), ("Leiras (TOOL13)", mc_windrow)]:
             stats_list.append({
                 "Tecnologia": nome,
                 "Média (tCO₂eq)": np.mean(arr),
@@ -731,9 +741,18 @@ else:
 
 st.markdown("---")
 st.markdown("""
-**📚 Referências:**
-- Baseline (aterro): A6.4-AMT-003 (UNFCCC, 2024) – calibrado para Ribeirão Preto (CGR Guatapará, captura 60%).
-- Compostagem termofílica: Yang et al. (2017) – fatores CH₄ = 0,0060, N₂O = 0,0196.
-- Compostagem em leiras: TOOL13 v02.0 (UNFCCC, 2017) – fatores padrão CH₄ = 0,002, N₂O = 0,0005.
-- GWP-20: Forster et al. (2021) – CH₄ = 79,7; N₂O = 273.
+**📚 Referências completas:**
+
+**Baseline (aterro sanitário):**
+- Ferramenta A6.4-AMT-003 (v01.0) – "Emissions from solid waste disposal sites" (UNFCCC, 2024)
+- Calibrado para o aterro CGR Guatapará (Ribeirão Preto): MCF = 1,0; captura de metano = 60%; φ = 0,85 (clima úmido)
+
+**Compostagem termofílica:**
+- Yang, F., Li, G., Zuo, X., & Yang, H. (2017). Emission factors of CH₄ and N₂O during thermophilic composting of food waste. *Waste Management*, 66, 44-51. DOI: 10.1016/j.wasman.2017.04.033
+
+**Compostagem em leiras (windrow):**
+- TOOL13, versão 02.0 (UNFCCC, 2017) – "Project and leakage emissions from composting". Disponível em: https://cdm.unfccc.int/methodologies/PAmethodologies/tools/am-tool-13-v2.pdf
+
+**Potencial de Aquecimento Global (GWP-20):**
+- Forster, P., et al. (2021). The Earth’s Energy Budget, Climate Feedbacks, and Climate Sensitivity. In *Climate Change 2021: The Physical Science Basis*. Contribution of Working Group I to the Sixth Assessment Report of the IPCC.
 """)
