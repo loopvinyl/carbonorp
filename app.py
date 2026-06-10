@@ -336,15 +336,9 @@ st.title("🌍 Simulador de Emissões de GEE e Créditos de Carbono")
 st.caption("Comparação: Vermicompostagem (Yang et al. 2017) vs Compostagem Termofílica (Yang et al. 2017) vs Fatores Padrão UNFCCC (AMS‑III.F / TOOL13). Baseline = Aterro em Guatapará, destino da maior parte dos RSU de Ribeirão Preto")
 
 with st.container():
+    # NOTA METODOLÓGICA REFINADA EM UM ÚNICO PARÁGRAFO CONTÍNUO
     st.markdown("""
-    **📘 Nota metodológica:**  
-    A metodologia **AMS‑III.F** e sua ferramenta **TOOL13** (UNFCCC, 2016) fornecem fatores de emissão padrão para qualquer projeto de compostagem: CH₄ = 0,002 t/t resíduo úmido** e **N₂O = 0,0005 t/t resíduo úmido**. Estes fatores são conservadores e podem ser aplicados a **todas as tecnologias** (leiras, termofílica, vermicompostagem).  
-
-    Neste simulador, para fins de comparação científica, utilizamos:  
-    - **Fatores padrão UNFCCC** → aplicados a um cenário de compostagem em leiras aeradas.  
-    - **Fatores experimentais de Yang et al. (2017)** → para vermicompostagem e compostagem termofílica.  
-
-    Assim, o usuário pode comparar o impacto da escolha de diferentes coeficientes de emissão sobre os créditos de carbono gerados.
+    **📘 Nota metodológica:** A metodologia **AMS‑III.F** e sua ferramenta **TOOL13** (UNFCCC, 2016) fornecem fatores de emissão padrão para qualquer projeto de compostagem: **CH₄ = 0,002 t/t resíduo úmido** e **N₂O = 0,0005 t/t resíduo úmido**. Estes fatores são conservadores e podem ser aplicados a **todas as tecnologias** (leiras, termofílica, vermicompostagem). Neste simulador, para fins de comparação científica, utilizamos: **Fatores padrão UNFCCC** → aplicados a um cenário de compostagem em leiras aeradas; **Fatores experimentais de Yang et al. (2017)** → para vermicompostagem e compostagem termofílica. Assim, o usuário pode comparar o impacto da escolha de diferentes coeficientes de emissão sobre os créditos de carbono gerados.
     """)
     st.divider()
 
@@ -366,7 +360,8 @@ with st.sidebar:
     
     st.subheader("🎯 Cenário de GWP para Resultados Principais")
     st.markdown("""
-    O **Potencial de Aquecimento Global (GWP)** define o peso do metano (CH₄) e do óxido nitroso (N₂O) em equivalente CO₂. A escolha do cenário altera significativamente as emissões evitadas e o valor dos créditos de carbono.
+    O **Potencial de Aquecimento Global (GWP)** define o peso do metano (CH₄) e do óxido nitroso (N₂O) em equivalente CO₂.  
+    A escolha do cenário altera significativamente as emissões evitadas e o valor dos créditos de carbono.
     """)
     gwp_option = st.radio(
         "Selecione o cenário:",
@@ -423,14 +418,12 @@ def cached_montecarlo(n, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
 # Execução
 if st.session_state.get('run_simulation', False):
     with st.spinner("Executando simulação..."):
-        # Dicionário com os GWPs
         gwps = {
             "Otimista (GWP-20)": (79.7, 273),
             "Realista (GWP-100)": (27.0, 273),
             "Pessimista (GWP-500)": (7.2, 130)
         }
         
-        # Calcula todos os cenários
         results_all = {}
         for nome, (gwp_c, gwp_n) in gwps.items():
             calc = GHGEmissionCalculator()
@@ -438,7 +431,6 @@ if st.session_state.get('run_simulation', False):
             calc.GWP_N2O_20 = gwp_n
             results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao)
         
-        # Seleciona o cenário principal de acordo com a escolha do usuário
         selected = st.session_state.selected_gwp
         res = results_all[selected]
         
@@ -472,7 +464,6 @@ if st.session_state.get('run_simulation', False):
         - Baseline: captura de metano = 60%, φ = 0,85 (UNFCCC 2024)
         """)
 
-        # ===== COMPARAÇÃO ENTRE CENÁRIOS DE GWP =====
         st.subheader("📊 Comparação entre todos os Cenários de GWP (tCO₂eq evitadas)")
         comp = []
         for nome, r in results_all.items():
@@ -491,7 +482,6 @@ if st.session_state.get('run_simulation', False):
         - Independentemente do cenário, a **vermocompostagem apresenta as maiores reduções**, seguida pela termofílica e depois pelos fatores padrão UNFCCC.
         """)
 
-        # ===== VALOR FINANCEIRO =====
         st.subheader(f"💰 Valor Financeiro ({selected})")
         preco = st.session_state.preco_carbono
         moeda = st.session_state.moeda_carbono
@@ -514,7 +504,6 @@ if st.session_state.get('run_simulation', False):
             st.metric("Euro", f"{moeda} {formatar_br(v_std*preco)}")
             st.metric("R$", f"R$ {formatar_br(v_std*preco*cambio)}")
         
-        # Cálculo seguro das razões
         razao_vt = v_vermi / v_termo if v_termo != 0 else np.inf
         razao_vs = v_vermi / v_std if v_std != 0 else np.inf
         razao_vt_str = formatar_br(razao_vt) if np.isfinite(razao_vt) else "infinito"
@@ -526,7 +515,6 @@ if st.session_state.get('run_simulation', False):
         - Para cada tonelada de resíduo tratado, o retorno financeiro apenas com créditos de carbono (sem custos operacionais) é de **{moeda} {formatar_br((v_vermi*preco)/(residuos_kg_dia*365*anos_simulacao/1000))} por t**.
         """)
 
-        # ===== COMPARAÇÃO ANUAL (BARRAS) =====
         st.subheader(f"📊 Comparação Anual das Emissões Evitadas ({selected})")
         fig, ax = plt.subplots(figsize=(12,6))
         x = np.arange(len(df_anual['Year']))
@@ -552,7 +540,6 @@ if st.session_state.get('run_simulation', False):
         As emissões evitadas crescem ano a ano devido ao acúmulo de resíduos e à dinâmica de degradação do aterro (modelo FOD). Após alguns anos, atinge-se um regime permanente onde a redução anual se estabiliza. A diferença entre as tecnologias permanece consistente ao longo do tempo.
         """)
 
-        # ===== EMISSÕES ACUMULADAS =====
         st.subheader(f"📉 Emissões Acumuladas (Baseline vs Tecnologias) - {selected}")
         fig2, ax2 = plt.subplots(figsize=(11,6))
         ax2.plot(datas, base_acum, 'r-', label='Baseline (Aterro)')
@@ -576,10 +563,8 @@ if st.session_state.get('run_simulation', False):
         - A área verde no gráfico representa exatamente as emissões evitadas pela vermicompostagem.
         """)
 
-        # ===== ANÁLISE DE SENSIBILIDADE SOBOL =====
         st.subheader(f"🎯 Análise de Sensibilidade Sobol ({selected})")
         with st.spinner("Sobol em execução..."):
-            # O Sobol será calculado para o cenário selecionado (usando os mesmos GWPs)
             gwp_c, gwp_n = gwps[selected]
             Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, gwp_c, gwp_n)
         df_sens = pd.DataFrame({
@@ -603,7 +588,6 @@ if st.session_state.get('run_simulation', False):
         - Interações entre parâmetros são relevantes (diferença ST - S1 > 0,1), indicando não‑linearidades no modelo.
         """)
 
-        # ===== MONTE CARLO E TESTES ESTATÍSTICOS =====
         st.subheader(f"🎲 Monte Carlo e Testes Estatísticos ({selected})")
         with st.spinner("Monte Carlo em execução..."):
             gwp_c, gwp_n = gwps[selected]
@@ -634,7 +618,6 @@ if st.session_state.get('run_simulation', False):
         - A distribuição é aproximadamente normal (verifique o teste de Shapiro‑Wilk abaixo).
         """)
 
-        # Testes pareados
         st.write("**Testes de diferença significativa (p-valores):**")
         t_vt = stats.ttest_rel(arr_v, arr_t)[1]
         t_vs = stats.ttest_rel(arr_v, arr_s)[1]
@@ -658,7 +641,6 @@ if st.session_state.get('run_simulation', False):
         - O teste de Wilcoxon (não paramétrico) confirma a robustez da conclusão, mesmo sem assumir normalidade.
         """)
 
-        # ===== TABELA ANUAL DETALHADA =====
         st.subheader("📋 Resultados Anuais Detalhados")
         df_anual_fmt = df_anual[['Year','Base','Vermi','Termo','Std','Evitado_Vermi','Evitado_Termo','Evitado_Std']].copy()
         df_anual_fmt.columns = ['Ano','Baseline','Vermicompostagem (Yang)','Termofílica (Yang)','Fatores Padrão UNFCCC','Evitado Vermi','Evitado Termo','Evitado Std']
