@@ -459,7 +459,9 @@ inicializar_session_state()
 # =============================================================================
 # INTERFACE PRINCIPAL E PARÂMETROS DE ENTRADA
 # =============================================================================
-st.title("Simulador de Emissões de GEE e Créditos de Carbono: Yang et al. 2017 vs TOOL13/AMS‑III.F com Baseline Aterro (Ribeirão Preto)")
+st.title("Simulador de Emissões de GEE e Créditos de Carbono")
+st.caption("Comparação: Vermicompostagem (Yang et al. 2017) vs Compostagem Termofílica (Yang et al. 2017) vs Compostagem Convencional (TOOL13/AMS‑III.F) – Baseline Aterro Guatapará (Ribeirão Preto)")
+
 st.markdown("""
 **Tecnologias avaliadas:**
 - **Vermicompostagem** – fatores de emissão de **Yang et al. (2017)**
