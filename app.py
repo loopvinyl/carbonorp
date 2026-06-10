@@ -517,7 +517,9 @@ if st.session_state.get('run_simulation', False):
             'S1_Termo': Si_t['S1'], 'ST_Termo': Si_t['ST'],
             'S1_Std': Si_s['S1'], 'ST_Std': Si_s['ST']
         })
-        st.dataframe(df_sens.style.format('{:.4f}'))
+        # Formata apenas as colunas numéricas (S1_* e ST_*)
+        num_cols = [col for col in df_sens.columns if col != 'Parâmetro']
+        st.dataframe(df_sens.style.format({col: '{:.4f}' for col in num_cols}))
 
         # Monte Carlo
         st.subheader("🎲 Monte Carlo e Testes Estatísticos (GWP-20)")
