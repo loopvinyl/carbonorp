@@ -324,6 +324,8 @@ def inicializar_session_state():
         st.session_state.run_simulation = False
     if 'k_ano' not in st.session_state:
         st.session_state.k_ano = 0.06
+    if 'selected_gwp' not in st.session_state:
+        st.session_state.selected_gwp = "Otimista (GWP-20)"
 
 inicializar_session_state()
 
@@ -363,6 +365,24 @@ with st.sidebar:
     anos_simulacao = st.slider("Anos de simulação", 5, 50, 20, 5)
     n_simulations = st.slider("Monte Carlo (n)", 50, 1000, 100, 50)
     n_samples = st.slider("Sobol (amostras)", 32, 256, 64, 16)
+    
+    st.subheader("🎯 Cenário de GWP para Resultados Principais")
+    st.markdown("""
+    O **Potencial de Aquecimento Global (GWP)** define o peso do metano (CH₄) e do óxido nitroso (N₂O) em equivalente CO₂.  
+    A escolha do cenário altera significativamente as emissões evitadas e o valor dos créditos de carbono.
+    """)
+    gwp_option = st.radio(
+        "Selecione o cenário:",
+        ["Otimista (GWP-20)", "Realista (GWP-100)", "Pessimista (GWP-500)"],
+        index=0,
+        help="""
+        - **Otimista (GWP-20)**: Fatores altos (CH₄=79,7; N₂O=273). Gera as maiores emissões evitadas. Recomendado para projetos que buscam maximizar créditos em horizonte de curto prazo (20 anos).
+        - **Realista (GWP-100)**: Padrão mais aceito internacionalmente (CH₄=27,0; N₂O=273). Balança precisão e aceitação regulatória.
+        - **Pessimista (GWP-500)**: Fatores baixos (CH₄=7,2; N₂O=130). Resulta nas menores emissões evitadas. Visão de longo prazo (500 anos) ou para metodologias conservadoras.
+        """
+    )
+    st.session_state.selected_gwp = gwp_option
+    
     if st.button("🚀 Executar Simulação", type="primary"):
         st.session_state.run_simulation = True
 
@@ -406,15 +426,25 @@ def cached_montecarlo(n, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
 # Execução
 if st.session_state.get('run_simulation', False):
     with st.spinner("Executando simulação..."):
-        gwps = {"Otimista (GWP-20)": (79.7,273), "Realista (GWP-100)": (27.0,273), "Pessimista (GWP-500)": (7.2,130)}
+        # Dicionário com os GWPs
+        gwps = {
+            "Otimista (GWP-20)": (79.7, 273),
+            "Realista (GWP-100)": (27.0, 273),
+            "Pessimista (GWP-500)": (7.2, 130)
+        }
+        
+        # Calcula todos os cenários
         results_all = {}
         for nome, (gwp_c, gwp_n) in gwps.items():
             calc = GHGEmissionCalculator()
             calc.GWP_CH4_20 = gwp_c
             calc.GWP_N2O_20 = gwp_n
             results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao)
-
-        res = results_all["Otimista (GWP-20)"]
+        
+        # Seleciona o cenário principal de acordo com a escolha do usuário
+        selected = st.session_state.selected_gwp
+        res = results_all[selected]
+        
         base_series = res['base_series']
         vermi_series = res['vermi_series']
         termo_series = res['thermo_series']
@@ -434,7 +464,7 @@ if st.session_state.get('run_simulation', False):
         termo_acum = np.cumsum(termo_series)
         std_acum = np.cumsum(std_series)
 
-        st.header("📈 Resultados da Simulação (GWP-20)")
+        st.header(f"📈 Resultados da Simulação - {selected}")
         st.info(f"""
         **Parâmetros – Ribeirão Preto (Aterro Guatapará):**  
         - k = {formatar_br(k_ano)} ano⁻¹  
@@ -446,7 +476,7 @@ if st.session_state.get('run_simulation', False):
         """)
 
         # ===== COMPARAÇÃO ENTRE CENÁRIOS DE GWP =====
-        st.subheader("📊 Comparação entre Cenários de GWP (tCO₂eq evitadas)")
+        st.subheader("📊 Comparação entre todos os Cenários de GWP (tCO₂eq evitadas)")
         comp = []
         for nome, r in results_all.items():
             comp.append({"Cenário": nome,
@@ -465,7 +495,7 @@ if st.session_state.get('run_simulation', False):
         """)
 
         # ===== VALOR FINANCEIRO =====
-        st.subheader("💰 Valor Financeiro (Cenário Otimista)")
+        st.subheader(f"💰 Valor Financeiro ({selected})")
         preco = st.session_state.preco_carbono
         moeda = st.session_state.moeda_carbono
         cambio = st.session_state.taxa_cambio
@@ -500,7 +530,7 @@ if st.session_state.get('run_simulation', False):
         """)
 
         # ===== COMPARAÇÃO ANUAL (BARRAS) =====
-        st.subheader("📊 Comparação Anual das Emissões Evitadas (GWP-20)")
+        st.subheader(f"📊 Comparação Anual das Emissões Evitadas ({selected})")
         fig, ax = plt.subplots(figsize=(12,6))
         x = np.arange(len(df_anual['Year']))
         width = 0.25
@@ -514,7 +544,7 @@ if st.session_state.get('run_simulation', False):
         ax.set_xticks(x)
         ax.set_xticklabels(df_anual['Year'])
         ax.set_ylabel('tCO₂eq evitadas')
-        ax.set_title('Emissões Evitadas por Ano')
+        ax.set_title(f'Emissões Evitadas por Ano - {selected}')
         ax.legend()
         ax.yaxis.set_major_formatter(FuncFormatter(br_format))
         st.pyplot(fig)
@@ -526,14 +556,14 @@ if st.session_state.get('run_simulation', False):
         """)
 
         # ===== EMISSÕES ACUMULADAS =====
-        st.subheader("📉 Emissões Acumuladas (Baseline vs Tecnologias)")
+        st.subheader(f"📉 Emissões Acumuladas (Baseline vs Tecnologias) - {selected}")
         fig2, ax2 = plt.subplots(figsize=(11,6))
         ax2.plot(datas, base_acum, 'r-', label='Baseline (Aterro)')
         ax2.plot(datas, vermi_acum, 'g-', label='Vermicompostagem (Yang)')
         ax2.plot(datas, termo_acum, 'orange', label='Termofílica (Yang)')
         ax2.plot(datas, std_acum, 'steelblue', label='Fatores Padrão UNFCCC')
         ax2.fill_between(datas, vermi_acum, base_acum, alpha=0.3, color='lightgreen')
-        ax2.set_title(f'Emissões Acumuladas – {anos_simulacao} anos (k={formatar_br(k_ano)} ano⁻¹)')
+        ax2.set_title(f'Emissões Acumuladas – {anos_simulacao} anos (k={formatar_br(k_ano)} ano⁻¹) - {selected}')
         ax2.set_xlabel('Data')
         ax2.set_ylabel('tCO₂eq')
         ax2.legend()
@@ -550,10 +580,11 @@ if st.session_state.get('run_simulation', False):
         """)
 
         # ===== ANÁLISE DE SENSIBILIDADE SOBOL =====
-        st.subheader("🎯 Análise de Sensibilidade Sobol (GWP-20)")
+        st.subheader(f"🎯 Análise de Sensibilidade Sobol ({selected})")
         with st.spinner("Sobol em execução..."):
-            g20c, g20n = gwps["Otimista (GWP-20)"]
-            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, g20c, g20n)
+            # O Sobol será calculado para o cenário selecionado (usando os mesmos GWPs)
+            gwp_c, gwp_n = gwps[selected]
+            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, gwp_c, gwp_n)
         df_sens = pd.DataFrame({
             'Parâmetro': ['k','T','DOC'],
             'S1_Vermi': Si_v['S1'], 'ST_Vermi': Si_v['ST'],
@@ -576,15 +607,16 @@ if st.session_state.get('run_simulation', False):
         """)
 
         # ===== MONTE CARLO E TESTES ESTATÍSTICOS =====
-        st.subheader("🎲 Monte Carlo e Testes Estatísticos (GWP-20)")
+        st.subheader(f"🎲 Monte Carlo e Testes Estatísticos ({selected})")
         with st.spinner("Monte Carlo em execução..."):
-            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, g20c, g20n)
+            gwp_c, gwp_n = gwps[selected]
+            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, gwp_c, gwp_n)
 
         fig3, ax3 = plt.subplots(figsize=(10,5))
         sns.kdeplot(arr_v, label='Vermicompostagem (Yang)', ax=ax3)
         sns.kdeplot(arr_t, label='Termofílica (Yang)', ax=ax3)
         sns.kdeplot(arr_s, label='Fatores Padrão UNFCCC', ax=ax3)
-        ax3.set_title('Distribuição das Emissões Evitadas')
+        ax3.set_title(f'Distribuição das Emissões Evitadas - {selected}')
         ax3.set_xlabel('tCO₂eq')
         ax3.xaxis.set_major_formatter(FuncFormatter(br_format))
         st.pyplot(fig3)
@@ -647,7 +679,7 @@ if st.session_state.get('run_simulation', False):
 
     st.session_state.run_simulation = False
 else:
-    st.info("💡 Ajuste os parâmetros na barra lateral e clique em **Executar Simulação** para ver os resultados.")
+    st.info("💡 Ajuste os parâmetros na barra lateral, selecione o cenário de GWP desejado e clique em **Executar Simulação** para ver os resultados.")
 
 st.markdown("---")
 with st.expander("📚 Referências Metodológicas Detalhadas"):
