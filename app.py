@@ -1,3 +1,4 @@
+
 # IMPORTAÇÕES E CONFIGURAÇÕES INICIAIS
 import requests
 import streamlit as st
@@ -286,7 +287,7 @@ inicializar_session_state()
 # INTERFACE PRINCIPAL
 st.title("Comparação de Tecnologias de Compostagem para Créditos de Carbono")
 st.markdown("""
-Esta ferramenta compara **duas tecnologias de compostagem** (Termofílica (Yang et al., 2017) e Leiras (TOOL13)) com o **cenário baseline (aterro sanitário)** calibrado para Ribeirão Preto (aterro CGR Guatapará com captura de biogás).  
+Esta ferramenta compara **duas tecnologias de compostagem** Termofílica com fatores de emissões contidos em Yang et al. (2017) e Convencional em Leiras com fatores de emissões do TOOL13 da ONU com o **cenário baseline (aterro sanitário)** calibrado para Ribeirão Preto (aterro CGR Guatapará com captura de biogás).  
 **Estatísticas de diferença significativa** entre as emissões evitadas são calculadas via Monte Carlo.
 
 **Metodologias:**  
@@ -420,7 +421,7 @@ if st.session_state.get('run_simulation', False):
     st.pyplot(fig)
     plt.close(fig)
 
-    st.subheader("📉 Redução de Emissões Acumulada")
+    st.subheader("📉 Emissões Evitadas Acumuladas")
     base_acum = np.cumsum(base_series)
     thermo_acum = np.cumsum(thermo_series)
     wind_acum = np.cumsum(wind_series)
@@ -429,7 +430,7 @@ if st.session_state.get('run_simulation', False):
     ax2.plot(datas, thermo_acum, 'orange', label='Termofílica (Yang et al., 2017)', linewidth=2)
     ax2.plot(datas, wind_acum, 'green', label='Leiras (TOOL13)', linewidth=2)
     ax2.fill_between(datas, thermo_acum, wind_acum, color='gray', alpha=0.3, label='Diferença entre tecnologias')
-    ax2.set_title(f'Redução de Emissões em {anos_simulacao} anos (k = {formatar_br(k_ano)} ano⁻¹)')
+    ax2.set_title(f'Emissões Evitadas em {anos_simulacao} anos (k = {formatar_br(k_ano)} ano⁻¹)')
     ax2.set_xlabel('Data')
     ax2.set_ylabel('tCO₂eq Acumulado')
     ax2.legend()
@@ -523,7 +524,7 @@ if st.session_state.get('run_simulation', False):
     # Tabela anual detalhada
     st.subheader("📋 Resultados Anuais (Cenário Otimista)")
     df_anual_fmt = df_anual[['Year', 'base', 'thermo', 'wind', 'Evitado_Thermo', 'Evitado_Wind']].copy()
-    df_anual_fmt.columns = ['Year', 'Baseline (tCO₂eq)', 'Termofílica (Yang et al., 2017) (tCO₂eq)', 'Leiras (TOOL13) (tCO₂eq)', 'Redução Termofílica (Yang et al., 2017)', 'Redução Leiras (TOOL13)']
+    df_anual_fmt.columns = ['Year', 'Baseline (tCO₂eq)', 'Termofílica (Yang et al., 2017) (tCO₂eq)', 'Leiras (TOOL13) (tCO₂eq)', 'Emissões Evitadas Termofílica (Yang et al., 2017)', 'Emissões Evitadas Leiras (TOOL13)']
     for col in df_anual_fmt.columns:
         if col != 'Year':
             df_anual_fmt[col] = df_anual_fmt[col].apply(formatar_br)
