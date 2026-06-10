@@ -20,7 +20,7 @@ np.random.seed(50)
 
 # Configuração da página Streamlit
 st.set_page_config(
-    page_title="Simulador de Emissões de tCO₂eq e Cálculo de Créditos de Carbono - Comparação de Tecnologias",
+    page_title="Comparação de Tecnologias de Compostagem (Yang et al. 2017 vs TOOL13/AMS‑III.F) com Baseline Aterro (Ribeirão Preto)",
     layout="wide"
 )
 
@@ -47,13 +47,13 @@ PHI_BASELINE = 0.85                  # Fator φ para clima úmido (UNFCCC 2024)
 EF_CH4_WINDROW = 0.002               # t CH₄ / t resíduo úmido
 EF_N2O_WINDROW = 0.0005              # t N₂O / t resíduo úmido
 
-# Parâmetros fixos baseados na literatura (usados pela classe)
+# Parâmetros fixos baseados na literatura (Yang et al. 2017 para vermi e termo)
 TOC = 0.436                # Carbono orgânico total
 TN = 0.0142                # Nitrogênio total
-F_CH4_VERMI = 0.00013       # Fração de CH4 na vermicompostagem
-F_N2O_VERMI = 0.00092       # Fração de N2O na vermicompostagem
-F_CH4_THERMO = 0.00060      # Fração de CH4 na compostagem termofílica
-F_N2O_THERMO = 0.00196      # Fração de N2O na compostagem termofílica
+F_CH4_VERMI = 0.0013       # Fração de CH4 na vermicompostagem (Yang et al. 2017)
+F_N2O_VERMI = 0.0092       # Fração de N2O na vermicompostagem (Yang et al. 2017)
+F_CH4_THERMO = 0.0060      # Fração de CH4 na compostagem termofílica (Yang et al. 2017)
+F_N2O_THERMO = 0.0196      # Fração de N2O na compostagem termofílica (Yang et al. 2017)
 COMPOSTING_DAYS = 50       # Duração do processo de compostagem (dias)
 GWP_CH4_20 = 79.7          # GWP-20 para CH4 (Forster et al. 2021)
 GWP_N2O_20 = 273           # GWP-20 para N2O (Forster et al. 2021)
@@ -99,8 +99,8 @@ class GHGEmissionCalculator:
     """
     Calcula emissões de CH₄ e N₂O para:
     - Aterro sanitário (baseline, método FOD do IPCC) calibrado para Ribeirão Preto
-    - Vermicompostagem
-    - Compostagem termofílica
+    - Vermicompostagem (Yang et al. 2017)
+    - Compostagem termofílica (Yang et al. 2017)
     - Compostagem convencional em leiras (windrow) - TOOL13/AMS‑III.F
     Inclui correção φ (UNFCCC 2024) e fator de captura de metano.
     """
@@ -177,7 +177,7 @@ class GHGEmissionCalculator:
         return ch4_emissions + ch4_pre, n2o_emissions + n2o_pre
 
     def calculate_vermicomposting_emissions(self, waste_kg_day, moisture_fraction, years=20):
-        """Emissões da vermicompostagem."""
+        """Emissões da vermicompostagem (Yang et al. 2017)."""
         days = years * 365
         dry_fraction = 1 - moisture_fraction
         ch4_per_batch = (waste_kg_day * self.TOC * self.f_CH4_vermi * (16/12) * dry_fraction)
@@ -193,7 +193,7 @@ class GHGEmissionCalculator:
         return ch4_emissions, n2o_emissions
 
     def calculate_thermophilic_emissions(self, waste_kg_day, moisture_fraction, years=20):
-        """Emissões da compostagem termofílica."""
+        """Emissões da compostagem termofílica (Yang et al. 2017)."""
         days = years * 365
         dry_fraction = 1 - moisture_fraction
         ch4_per_batch = (waste_kg_day * self.TOC * self.f_CH4_thermo * (16/12) * dry_fraction)
@@ -265,7 +265,7 @@ class GHGEmissionCalculator:
                 'co2eq_t': thermo_co2eq.sum(),
                 'avoided_co2eq_t': avoided_thermo
             },
-            'windrow': {      # convencional em leiras
+            'windrow': {      # convencional em leiras (TOOL13)
                 'ch4_kg': ch4_wind.sum(),
                 'n2o_kg': n2o_wind.sum(),
                 'co2eq_t': wind_co2eq.sum(),
@@ -459,14 +459,14 @@ inicializar_session_state()
 # =============================================================================
 # INTERFACE PRINCIPAL E PARÂMETROS DE ENTRADA
 # =============================================================================
-st.title("Simulador de Emissões de tCO₂eq e Cálculo de Créditos de Carbono com Análise de Sensibilidade Global")
+st.title("Comparação de Tecnologias de Compostagem para Créditos de Carbono")
 st.markdown("""
-Esta ferramenta projeta os Créditos de Carbono ao calcular as emissões de gases de efeito estufa para **três contextos de gestão de resíduos**:
-- **Vermicompostagem** (Yang et al., 2017)
-- **Compostagem termofílica** (Yang et al., 2017)
-- **Compostagem convencional em leiras** (TOOL13 / AMS‑III.F da UNFCCC)
+**Tecnologias avaliadas:**
+- **Vermicompostagem** – fatores de emissão de **Yang et al. (2017)**
+- **Compostagem termofílica** – fatores de emissão de **Yang et al. (2017)**
+- **Compostagem convencional em leiras (windrow)** – fatores padrão do **TOOL13** (AMS‑III.F da UNFCCC)
 
-O cenário baseline é o **aterro sanitário** calibrado para o **aterro CGR Guatapará (Ribeirão Preto)**, com captura de metano de 60% e fator φ = 0,85 (UNFCCC 2024 – clima úmido).
+O cenário **baseline** é o aterro sanitário calibrado para o **Aterro CGR Guatapará (Ribeirão Preto)** com captura de metano de 60% e fator φ = 0,85 (UNFCCC 2024 – clima úmido).
 """)
 
 exibir_cotacao_carbono()
@@ -513,6 +513,10 @@ with st.sidebar:
         3. **Carbono orgânico degradável (DOC):** 0.10 a 0.25
 
         **⚙️ Parâmetro fixo (não varia):** Umidade (85%)
+
+        **🔬 Origem dos fatores de emissão:**
+        - **Vermicompostagem e Termofílica:** Yang et al. (2017) – *Waste Management*.
+        - **Convencional (Leiras):** TOOL13 da UNFCCC (AMS‑III.F) – fatores conservadores para projetos de compostagem.
         """)
 
     st.subheader("🎯 Configuração de Simulação")
@@ -664,15 +668,15 @@ if st.session_state.get('run_simulation', False):
         for nome, res in results_all.items():
             comparacao.append({
                 "Cenário": nome,
-                "Vermicompostagem": res['vermicomposting']['avoided_co2eq_t'],
-                "Compostagem Termofílica": res['composting']['avoided_co2eq_t'],
-                "Compostagem Convencional (Leiras)": res['windrow']['avoided_co2eq_t']
+                "Vermicompostagem (Yang et al. 2017)": res['vermicomposting']['avoided_co2eq_t'],
+                "Compostagem Termofílica (Yang et al. 2017)": res['composting']['avoided_co2eq_t'],
+                "Compostagem Convencional (TOOL13 / AMS‑III.F)": res['windrow']['avoided_co2eq_t']
             })
         df_comp_gwp = pd.DataFrame(comparacao)
         st.dataframe(df_comp_gwp.style.format({
-            "Vermicompostagem": lambda x: formatar_br(x),
-            "Compostagem Termofílica": lambda x: formatar_br(x),
-            "Compostagem Convencional (Leiras)": lambda x: formatar_br(x)
+            "Vermicompostagem (Yang et al. 2017)": lambda x: formatar_br(x),
+            "Compostagem Termofílica (Yang et al. 2017)": lambda x: formatar_br(x),
+            "Compostagem Convencional (TOOL13 / AMS‑III.F)": lambda x: formatar_br(x)
         }))
 
         # Valores financeiros (cenário otimista)
@@ -697,25 +701,25 @@ if st.session_state.get('run_simulation', False):
             st.metric("Preço Carbono (Euro)", f"{moeda} {formatar_br(preco_carbono)}/tCO₂eq",
                       help=f"Fonte: {fonte_cotacao}")
         with col2:
-            st.metric("Vermicompostagem (Euro)", f"{moeda} {formatar_br(valor_vermi_eur)}",
+            st.metric("Vermicompostagem (Yang et al.) (Euro)", f"{moeda} {formatar_br(valor_vermi_eur)}",
                       help=f"{formatar_br(total_evitado_vermi)} tCO₂eq evitadas")
         with col3:
-            st.metric("Termofílica (Euro)", f"{moeda} {formatar_br(valor_thermo_eur)}",
+            st.metric("Termofílica (Yang et al.) (Euro)", f"{moeda} {formatar_br(valor_thermo_eur)}",
                       help=f"{formatar_br(total_evitado_thermo)} tCO₂eq evitadas")
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Convencional (Euro)", f"{moeda} {formatar_br(valor_wind_eur)}",
+            st.metric("Convencional (TOOL13) (Euro)", f"{moeda} {formatar_br(valor_wind_eur)}",
                       help=f"{formatar_br(total_evitado_wind)} tCO₂eq evitadas")
         with col2:
             st.metric("Preço Carbono (R$)", f"R$ {formatar_br(preco_carbono * taxa_cambio)}/tCO₂eq",
                       help="Preço convertido para Reais")
         with col3:
-            st.metric("Vermicompostagem (R$)", f"R$ {formatar_br(valor_vermi_brl)}")
+            st.metric("Vermicompostagem (Yang et al.) (R$)", f"R$ {formatar_br(valor_vermi_brl)}")
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Termofílica (R$)", f"R$ {formatar_br(valor_thermo_brl)}")
+            st.metric("Termofílica (Yang et al.) (R$)", f"R$ {formatar_br(valor_thermo_brl)}")
         with col2:
-            st.metric("Convencional (R$)", f"R$ {formatar_br(valor_wind_brl)}")
+            st.metric("Convencional (TOOL13) (R$)", f"R$ {formatar_br(valor_wind_brl)}")
 
         with st.expander("💡 Como funciona a comercialização no mercado de carbono?"):
             st.markdown(f"""
@@ -735,15 +739,15 @@ if st.session_state.get('run_simulation', False):
         media_anual_wind = total_evitado_wind / anos_simulacao
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown("#### 🪱 Vermicompostagem")
+            st.markdown("#### 🪱 Vermicompostagem (Yang et al. 2017)")
             st.metric("Total evitado", f"{formatar_br(total_evitado_vermi)} tCO₂eq")
             st.metric("Média anual", f"{formatar_br(media_anual_vermi)} tCO₂eq/ano")
         with col2:
-            st.markdown("#### 🔥 Termofílica")
+            st.markdown("#### 🔥 Termofílica (Yang et al. 2017)")
             st.metric("Total evitado", f"{formatar_br(total_evitado_thermo)} tCO₂eq")
             st.metric("Média anual", f"{formatar_br(media_anual_thermo)} tCO₂eq/ano")
         with col3:
-            st.markdown("#### 🌿 Convencional (Leiras)")
+            st.markdown("#### 🌿 Convencional (TOOL13 / AMS‑III.F)")
             st.metric("Total evitado", f"{formatar_br(total_evitado_wind)} tCO₂eq")
             st.metric("Média anual", f"{formatar_br(media_anual_wind)} tCO₂eq/ano")
 
@@ -752,9 +756,9 @@ if st.session_state.get('run_simulation', False):
         fig, ax = plt.subplots(figsize=(12, 6))
         x = np.arange(len(df_anual['Year']))
         width = 0.25
-        ax.bar(x - width, df_anual['Evitado_Vermi'], width, label='Vermicompostagem', edgecolor='black', color='forestgreen')
-        ax.bar(x, df_anual['Evitado_Termo'], width, label='Compostagem Termofílica', edgecolor='black', hatch='//', color='orange')
-        ax.bar(x + width, df_anual['Evitado_Wind'], width, label='Compostagem Convencional (Leiras)', edgecolor='black', hatch='\\\\', color='steelblue')
+        ax.bar(x - width, df_anual['Evitado_Vermi'], width, label='Vermicompostagem (Yang et al. 2017)', edgecolor='black', color='forestgreen')
+        ax.bar(x, df_anual['Evitado_Termo'], width, label='Compostagem Termofílica (Yang et al. 2017)', edgecolor='black', hatch='//', color='orange')
+        ax.bar(x + width, df_anual['Evitado_Wind'], width, label='Compostagem Convencional (TOOL13 / AMS‑III.F)', edgecolor='black', hatch='\\\\', color='steelblue')
         # Anotações
         for i, (v1, v2, v3) in enumerate(zip(df_anual['Evitado_Vermi'], df_anual['Evitado_Termo'], df_anual['Evitado_Wind'])):
             ax.text(i - width, v1 + max(v1,v2,v3)*0.01, formatar_br(v1), ha='center', fontsize=8, fontweight='bold')
@@ -762,7 +766,7 @@ if st.session_state.get('run_simulation', False):
             ax.text(i + width, v3 + max(v1,v2,v3)*0.01, formatar_br(v3), ha='center', fontsize=8, fontweight='bold')
         ax.set_xlabel('Ano', fontsize=12)
         ax.set_ylabel('Emissões Evitadas (t CO₂eq)', fontsize=12)
-        ax.set_title('Comparação Anual: Vermicompostagem vs Termofílica vs Convencional (GWP-20)', fontsize=13)
+        ax.set_title('Comparação Anual: Vermicompostagem vs Termofílica vs Convencional (TOOL13) – GWP-20', fontsize=13)
         ax.set_xticks(x)
         ax.set_xticklabels(df_anual['Year'], fontsize=9)
         ax.legend()
@@ -775,9 +779,9 @@ if st.session_state.get('run_simulation', False):
         st.subheader("📉 Emissões Acumuladas: Baseline vs Tecnologias (GWP-20)")
         fig2, ax2 = plt.subplots(figsize=(11, 6))
         ax2.plot(datas, base_acum, 'r-', label='Baseline (Aterro Sanitário)', linewidth=2)
-        ax2.plot(datas, vermi_acum, 'g-', label='Vermicompostagem', linewidth=2)
-        ax2.plot(datas, termo_acum, 'orange', label='Compostagem Termofílica', linewidth=2)
-        ax2.plot(datas, wind_acum, 'steelblue', label='Compostagem Convencional (Leiras)', linewidth=2)
+        ax2.plot(datas, vermi_acum, 'g-', label='Vermicompostagem (Yang et al. 2017)', linewidth=2)
+        ax2.plot(datas, termo_acum, 'orange', label='Compostagem Termofílica (Yang et al. 2017)', linewidth=2)
+        ax2.plot(datas, wind_acum, 'steelblue', label='Compostagem Convencional (TOOL13 / AMS‑III.F)', linewidth=2)
         ax2.fill_between(datas, vermi_acum, base_acum, color='lightgreen', alpha=0.3, label='Emissões evitadas (Vermi)')
         ax2.set_title(f'Emissões Acumuladas de tCO₂eq em {anos_simulacao} anos (k = {formatar_br(k_ano)} ano⁻¹)', fontsize=13)
         ax2.set_xlabel('Data', fontsize=12)
@@ -806,7 +810,7 @@ if st.session_state.get('run_simulation', False):
 
         fig3, ax3 = plt.subplots(figsize=(10, 5))
         sns.barplot(x='ST', y='Parâmetro', data=df_sens_vermi, palette='viridis', ax=ax3)
-        ax3.set_title('Sensibilidade Global - Vermicompostagem (GWP-20)')
+        ax3.set_title('Sensibilidade Global - Vermicompostagem (Yang et al. 2017) - GWP-20')
         ax3.set_xlabel('Índice ST (Sobol Total)')
         ax3.set_ylabel('')
         ax3.grid(axis='x', linestyle='--', alpha=0.7)
@@ -826,7 +830,7 @@ if st.session_state.get('run_simulation', False):
         df_sens_thermo['Parâmetro'] = df_sens_thermo['Parâmetro'].map(nomes_amigaveis)
         fig4, ax4 = plt.subplots(figsize=(10, 5))
         sns.barplot(x='ST', y='Parâmetro', data=df_sens_thermo, palette='viridis', ax=ax4)
-        ax4.set_title('Sensibilidade Global - Compostagem Termofílica (GWP-20)')
+        ax4.set_title('Sensibilidade Global - Compostagem Termofílica (Yang et al. 2017) - GWP-20')
         ax4.set_xlabel('Índice ST (Sobol Total)')
         ax4.grid(axis='x', linestyle='--', alpha=0.7)
         ax4.xaxis.set_major_formatter(FuncFormatter(br_format))
@@ -845,7 +849,7 @@ if st.session_state.get('run_simulation', False):
         df_sens_wind['Parâmetro'] = df_sens_wind['Parâmetro'].map(nomes_amigaveis)
         fig5, ax5 = plt.subplots(figsize=(10, 5))
         sns.barplot(x='ST', y='Parâmetro', data=df_sens_wind, palette='viridis', ax=ax5)
-        ax5.set_title('Sensibilidade Global - Compostagem Convencional (Leiras) (GWP-20)')
+        ax5.set_title('Sensibilidade Global - Compostagem Convencional (TOOL13 / AMS‑III.F) - GWP-20')
         ax5.set_xlabel('Índice ST (Sobol Total)')
         ax5.grid(axis='x', linestyle='--', alpha=0.7)
         ax5.xaxis.set_major_formatter(FuncFormatter(br_format))
@@ -864,9 +868,9 @@ if st.session_state.get('run_simulation', False):
 
         # Distribuições
         fig6, ax6 = plt.subplots(figsize=(12, 6))
-        sns.kdeplot(arr_vermi_mc, label='Vermicompostagem', linewidth=2, ax=ax6)
-        sns.kdeplot(arr_thermo_mc, label='Compostagem Termofílica', linewidth=2, ax=ax6)
-        sns.kdeplot(arr_wind_mc, label='Compostagem Convencional (Leiras)', linewidth=2, ax=ax6)
+        sns.kdeplot(arr_vermi_mc, label='Vermicompostagem (Yang et al. 2017)', linewidth=2, ax=ax6)
+        sns.kdeplot(arr_thermo_mc, label='Compostagem Termofílica (Yang et al. 2017)', linewidth=2, ax=ax6)
+        sns.kdeplot(arr_wind_mc, label='Compostagem Convencional (TOOL13 / AMS‑III.F)', linewidth=2, ax=ax6)
         ax6.set_title('Distribuição de Probabilidade das Emissões Evitadas – Monte Carlo (GWP-20)', fontsize=13)
         ax6.set_xlabel('Emissões Evitadas (tCO₂eq)', fontsize=12)
         ax6.set_ylabel('Densidade de Probabilidade', fontsize=12)
@@ -878,7 +882,9 @@ if st.session_state.get('run_simulation', False):
 
         # Estatísticas descritivas
         stats_list = []
-        for nome, arr in [("Vermicompostagem", arr_vermi_mc), ("Termofílica", arr_thermo_mc), ("Convencional (Leiras)", arr_wind_mc)]:
+        for nome, arr in [("Vermicompostagem (Yang et al. 2017)", arr_vermi_mc),
+                          ("Compostagem Termofílica (Yang et al. 2017)", arr_thermo_mc),
+                          ("Compostagem Convencional (TOOL13 / AMS‑III.F)", arr_wind_mc)]:
             stats_list.append({
                 "Tecnologia": nome,
                 "Média (tCO₂eq)": np.mean(arr),
@@ -915,17 +921,22 @@ if st.session_state.get('run_simulation', False):
         wilcoxon_tw = stats.wilcoxon(arr_thermo_mc, arr_wind_mc)
 
         comparacao_stats = pd.DataFrame([
-            {"Comparação": "Vermi vs Termo", "p-normalidade": shapiro_vt[1], "p-t pareado": ttest_vt[1], "p-Wilcoxon": wilcoxon_vt[1]},
-            {"Comparação": "Vermi vs Wind", "p-normalidade": shapiro_vw[1], "p-t pareado": ttest_vw[1], "p-Wilcoxon": wilcoxon_vw[1]},
-            {"Comparação": "Termo vs Wind", "p-normalidade": shapiro_tw[1], "p-t pareado": ttest_tw[1], "p-Wilcoxon": wilcoxon_tw[1]}
+            {"Comparação": "Vermi (Yang) vs Termo (Yang)", "p-normalidade": shapiro_vt[1], "p-t pareado": ttest_vt[1], "p-Wilcoxon": wilcoxon_vt[1]},
+            {"Comparação": "Vermi (Yang) vs Wind (TOOL13)", "p-normalidade": shapiro_vw[1], "p-t pareado": ttest_vw[1], "p-Wilcoxon": wilcoxon_vw[1]},
+            {"Comparação": "Termo (Yang) vs Wind (TOOL13)", "p-normalidade": shapiro_tw[1], "p-t pareado": ttest_tw[1], "p-Wilcoxon": wilcoxon_tw[1]}
         ])
         st.dataframe(comparacao_stats.style.format({c: "{:.5f}" for c in comparacao_stats.columns if c != "Comparação"}))
 
-        # Tabelas anuais formatadas (apenas para vermi, mas pode-se expandir)
+        # Tabelas anuais formatadas
         st.subheader("📋 Resultados Anuais Detalhados (Cenário Otimista GWP-20)")
         df_anual_fmt = df_anual[['Year', 'Base', 'Vermi', 'Termo', 'Wind', 'Evitado_Vermi', 'Evitado_Termo', 'Evitado_Wind']].copy()
-        df_anual_fmt.columns = ['Ano', 'Baseline (tCO₂eq)', 'Vermicompostagem (tCO₂eq)', 'Termofílica (tCO₂eq)', 'Convencional (tCO₂eq)',
-                                 'Evitado Vermi', 'Evitado Termo', 'Evitado Wind']
+        df_anual_fmt.columns = ['Ano', 'Baseline (tCO₂eq)', 
+                                'Vermicompostagem (Yang et al.) (tCO₂eq)', 
+                                'Termofílica (Yang et al.) (tCO₂eq)', 
+                                'Convencional (TOOL13) (tCO₂eq)',
+                                'Evitado Vermi (Yang et al.)', 
+                                'Evitado Termo (Yang et al.)', 
+                                'Evitado Wind (TOOL13)']
         for col in df_anual_fmt.columns:
             if col != 'Ano':
                 df_anual_fmt[col] = df_anual_fmt[col].apply(formatar_br)
@@ -939,30 +950,12 @@ else:
 
 st.markdown("---")
 st.markdown("""
-**📚 Referências Metodológicas e Cenários:**
+**📚 Referências Metodológicas:**
 
-**Cenário de Baseline (Aterro Sanitário):**
-- Metano: IPCC (2006), UNFCCC (2016) e Wang et al. (2023)
-- Óxido Nitroso: Wang et al. (2017)
-- Metano e Óxido Nitroso no pré-descarte: Feng et al. (2020)
-- **Fator φ = 0,85 (UNFCCC, 2024) aplicado ao baseline para clima úmido**
-- **Captura de metano = 60%** (modelado a partir da usina de biogás do Aterro CGR Guatapará, Ribeirão Preto)
-
-**Vermicompostagem (tecnologia proposta):**
-- Metano e Óxido Nitroso: Yang et al. (2017)
-
-**Compostagem Termofílica (comparação científica):**
-- Protocolo AMS-III.F: UNFCCC (2016)
-- Fatores de emissões: Yang et al. (2017) – **não segue a metodologia AMS‑III.F**
-
-**Compostagem Convencional em Leiras (TOOL13 / AMS‑III.F):**
-- Fatores padrão da ferramenta: CH₄ = 0,002 t/t úmido; N₂O = 0,0005 t/t úmido (UNFCCC, 2016)
-- Tecnologia alinhada à metodologia da ONU para projetos de compostagem.
-
-**Cenários de Potencial de Aquecimento Global (GWP):**
-- **Otimista (GWP-20):** CH₄ = 79,7; N₂O = 273 (Forster et al., 2021)
-- **Realista (GWP-100):** CH₄ = 27,0; N₂O = 273 (Forster et al., 2021)
-- **Pessimista (GWP-500):** CH₄ = 7,2; N₂O = 130 (Forster et al., 2021)
+- **Vermicompostagem e Compostagem Termofílica:** Yang et al. (2017) – fatores experimentais (CH₄ = 0,0013 e 0,0060 t/tC; N₂O = 0,0092 e 0,0196 t/tN respectivamente).
+- **Compostagem Convencional em Leiras:** TOOL13 (v02.0) – ferramenta da metodologia AMS‑III.F (UNFCCC, 2016). Fatores padrão: CH₄ = 0,002 t/t úmido; N₂O = 0,0005 t/t úmido.
+- **Baseline (Aterro Sanitário):** Modelo FOD do IPCC (2006) com calibração para o Aterro CGR Guatapará (Ribeirão Preto) – captura de metano = 60%, φ = 0,85 (UNFCCC 2024).
+- **GWP:** Forster et al. (2021) IPCC AR6 (GWP-20, GWP-100, GWP-500).
 
 **⚠️ Nota de Reprodutibilidade:**
 - Todas as análises usam seed fixo (50) para garantir resultados reprodutíveis.
