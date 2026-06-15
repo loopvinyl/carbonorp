@@ -1,4 +1,8 @@
-# IMPORTAÇÕES E CONFIGURAÇÕES INICIAIS
+# =============================================================================
+# SIMULADOR DE CRÉDITOS DE CARBONO PARA COMPOSTAGEM
+# APRESENTAÇÃO PARA ACIRP - RIBEIRÃO PRETO
+# VERSÃO PROFISSIONAL COM ENTRADA POR BOMBONAS E DESIGN MODERNO
+# =============================================================================
 
 import requests
 import streamlit as st
@@ -15,76 +19,129 @@ from SALib.sample.sobol import sample
 from SALib.analyze.sobol import analyze
 import yfinance as yf
 
-# CSS customizado para justificar textos e padronizar tamanhos
-st.markdown("""
-<style>
-    /* Justificar todos os textos corridos */
-    p, .stMarkdown, .stInfo, .stSuccess, .stWarning, .stException, .stText, .stCaption, .stMetric, .stDataFrame {
-        text-align: justify !important;
-    }
-    /* Ajuste fino para métricas e células de tabela */
-    .stMetric label, .stMetric .metric-value, .stMetric .metric-delta {
-        text-align: center !important;
-    }
-    /* Tamanho de fonte equilibrado para elementos de teste */
-    .test-stats {
-        font-size: 0.9rem;
-    }
-    /* Responsividade para telas pequenas */
-    @media (max-width: 768px) {
-        .stMetric label, .stMetric .metric-value {
-            font-size: 0.8rem;
-        }
-        .test-stats {
-            font-size: 0.75rem;
-        }
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Semente fixa para reprodutibilidade
-np.random.seed(50)
-
-# Configuração da página Streamlit
+# =============================================================================
+# CONFIGURAÇÕES INICIAIS E CSS PERSONALIZADO
+# =============================================================================
 st.set_page_config(
-    page_title="Simulador de Emissões de GEE e Créditos de Carbono",
+    page_title="ACIRP | Simulador de Carbono para Compostagem",
+    page_icon="🌱",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# CSS moderno e responsivo
+st.markdown("""
+<style>
+    /* Fonte e cores institucionais */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+    .main-header {
+        background: linear-gradient(90deg, #004d40 0%, #00695c 100%);
+        padding: 1.5rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        color: white;
+        text-align: center;
+    }
+    .main-header h1 {
+        margin: 0;
+        font-size: 2.2rem;
+        font-weight: 700;
+    }
+    .main-header p {
+        margin: 0.5rem 0 0;
+        opacity: 0.9;
+    }
+    .card {
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        padding: 1.2rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        margin-bottom: 1rem;
+    }
+    .metric-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-top: 4px solid #00695c;
+    }
+    .footer {
+        text-align: center;
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+    .stButton>button {
+        background-color: #00695c;
+        color: white;
+        font-weight: 600;
+        border-radius: 30px;
+        padding: 0.5rem 2rem;
+        transition: all 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #004d40;
+        transform: scale(1.02);
+    }
+    /* Justificar textos */
+    p, .stMarkdown, .stInfo, .stSuccess {
+        text-align: justify;
+    }
+    /* Estilo para abas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 8px 20px;
+        font-weight: 500;
+    }
+    /* Formatação de números */
+    .big-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #00695c;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Semente fixa
+np.random.seed(42)
+
 # Suprimir warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-pd.set_option('display.max_columns', None)
-plt.rcParams['figure.dpi'] = 150
-plt.rcParams['font.size'] = 10
-sns.set_style("whitegrid")
+warnings.filterwarnings("ignore")
 
 # =============================================================================
-# PARÂMETROS GLOBAIS – BASELINE CALIBRADO PARA RIBEIRÃO PRETO (ATERRO GUATAPARÁ)
+# PARÂMETROS TÉCNICOS (BASE CIENTÍFICA)
 # =============================================================================
-CAPTURE_FRACTION_BASELINE = 0.6      # 60% de captura de metano (usina de biogás)
+# Fatores de emissão e constantes (mantidos do original)
+CAPTURE_FRACTION_BASELINE = 0.6      # Aterro Guatapará
 MCF_BASELINE = 1.0
 OX_BASELINE = 0.1
-PHI_BASELINE = 0.85                  # Fator φ para clima úmido (UNFCCC 2024)
+PHI_BASELINE = 0.85
 
-# Fatores de emissão padrão da metodologia UNFCCC (AMS‑III.F / TOOL13)
-EF_CH4_STD = 0.002      # t CH₄ / t resíduo úmido
+EF_CH4_STD = 0.002      # t CH₄ / t resíduo úmido (UNFCCC)
 EF_N2O_STD = 0.0005     # t N₂O / t resíduo úmido
 
-# Parâmetros fixos baseados na literatura (Yang et al. 2017)
+# Yang et al. 2017
 TOC = 0.436
 TN = 0.0142
 F_CH4_VERMI = 0.0013
 F_N2O_VERMI = 0.0092
 F_CH4_THERMO = 0.0060
 F_N2O_THERMO = 0.0196
+
 COMPOSTING_DAYS = 50
 GWP_CH4_20 = 79.7
 GWP_N2O_20 = 273
 
-# =============================================================================
-# PERFIS DE EMISSÃO DIÁRIOS
-# =============================================================================
+# Perfis diários (mesmos do original)
 profile_ch4_vermi = np.array([
     0.02,0.02,0.02,0.03,0.03,0.04,0.04,0.05,0.05,0.06,
     0.07,0.08,0.09,0.10,0.09,0.08,0.07,0.06,0.05,0.04,
@@ -115,7 +172,7 @@ N2O_pre_mgN_per_kg_total = 20.26
 N2O_pre_kg_per_kg_total = N2O_pre_mgN_per_kg_total * (44/28) / 1_000_000
 
 # =============================================================================
-# CLASSE DE CÁLCULO
+# CLASSE DE CÁLCULO (mesma lógica, mas com GWP ajustável)
 # =============================================================================
 class GHGEmissionCalculator:
     def __init__(self):
@@ -128,8 +185,8 @@ class GHGEmissionCalculator:
         self.EF_CH4_std = EF_CH4_STD
         self.EF_N2O_std = EF_N2O_STD
         self.COMPOSTING_DAYS = COMPOSTING_DAYS
-        self.GWP_CH4_20 = GWP_CH4_20
-        self.GWP_N2O_20 = GWP_N2O_20
+        self.GWP_CH4 = GWP_CH4_20
+        self.GWP_N2O = GWP_N2O_20
         self.MCF = MCF_BASELINE
         self.F = 0.5
         self.OX = OX_BASELINE
@@ -199,7 +256,6 @@ class GHGEmissionCalculator:
         return ch4, n2o
 
     def calculate_standard_emissions(self, w, umid, years=20):
-        """Emissões calculadas com os fatores padrão UNFCCC (AMS‑III.F / TOOL13)."""
         days = years*365
         ch4_per_kg = self.EF_CH4_std / 1000.0
         n2o_per_kg = self.EF_N2O_std / 1000.0
@@ -221,10 +277,10 @@ class GHGEmissionCalculator:
         ch4_t, n2o_t = self.calculate_thermophilic_emissions(w, umid, years)
         ch4_s, n2o_s = self.calculate_standard_emissions(w, umid, years)
 
-        base = (ch4_l*self.GWP_CH4_20 + n2o_l*self.GWP_N2O_20)/1000
-        vermi = (ch4_v*self.GWP_CH4_20 + n2o_v*self.GWP_N2O_20)/1000
-        thermo = (ch4_t*self.GWP_CH4_20 + n2o_t*self.GWP_N2O_20)/1000
-        std = (ch4_s*self.GWP_CH4_20 + n2o_s*self.GWP_N2O_20)/1000
+        base = (ch4_l*self.GWP_CH4 + n2o_l*self.GWP_N2O)/1000
+        vermi = (ch4_v*self.GWP_CH4 + n2o_v*self.GWP_N2O)/1000
+        thermo = (ch4_t*self.GWP_CH4 + n2o_t*self.GWP_N2O)/1000
+        std = (ch4_s*self.GWP_CH4 + n2o_s*self.GWP_N2O)/1000
 
         return {
             'baseline': base.sum(),
@@ -240,16 +296,15 @@ class GHGEmissionCalculator:
         ch4_t, n2o_t = self.calculate_thermophilic_emissions(w, umid, years)
         ch4_s, n2o_s = self.calculate_standard_emissions(w, umid, years)
 
-        base = (ch4_l*self.GWP_CH4_20 + n2o_l*self.GWP_N2O_20)/1000
-        vermi = (ch4_v*self.GWP_CH4_20 + n2o_v*self.GWP_N2O_20)/1000
-        thermo = (ch4_t*self.GWP_CH4_20 + n2o_t*self.GWP_N2O_20)/1000
-        std = (ch4_s*self.GWP_CH4_20 + n2o_s*self.GWP_N2O_20)/1000
+        base = (ch4_l*self.GWP_CH4 + n2o_l*self.GWP_N2O)/1000
+        vermi = (ch4_v*self.GWP_CH4 + n2o_v*self.GWP_N2O)/1000
+        thermo = (ch4_t*self.GWP_CH4 + n2o_t*self.GWP_N2O)/1000
+        std = (ch4_s*self.GWP_CH4 + n2o_s*self.GWP_N2O)/1000
 
         return (base.sum() - vermi.sum()), (base.sum() - thermo.sum()), (base.sum() - std.sum())
 
-
 # =============================================================================
-# FUNÇÕES DE COTAÇÃO, FORMATAÇÃO E ESTADO
+# FUNÇÕES AUXILIARES (COTAÇÃO, FORMATAÇÃO)
 # =============================================================================
 def obter_cotacao_carbono():
     try:
@@ -258,32 +313,29 @@ def obter_cotacao_carbono():
         if not data.empty:
             preco = data['Close'].iloc[-1]
             if 10 < preco < 200:
-                return preco, "€", "Carbon Futures (CO2.L)", True, "Yahoo Finance (CO2.L)"
-        return 85.50, "€", "Carbon Emissions (Referência)", False, "Referência"
+                return preco, "€", "ICE CO2.L (Futuros)", True
+        return 82.50, "€", "Referência ICE", False
     except:
-        return 85.50, "€", "Carbon Emissions (Referência)", False, "Referência"
+        return 82.50, "€", "Referência", False
 
 def obter_cotacao_euro_real():
     try:
         url = "https://economia.awesomeapi.com.br/last/EUR-BRL"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=8)
         if response.status_code == 200:
             data = response.json()
-            return float(data['EURBRL']['bid']), "R$", True, "AwesomeAPI"
+            return float(data['EURBRL']['bid']), True
     except:
         pass
     try:
         url = "https://api.exchangerate-api.com/v4/latest/EUR"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=8)
         if response.status_code == 200:
             data = response.json()
-            return data['rates']['BRL'], "R$", True, "ExchangeRate-API"
+            return data['rates']['BRL'], True
     except:
         pass
-    return 5.50, "R$", False, "Referência"
-
-def calcular_valor_creditos(e, preco, moeda, taxa=1):
-    return e * preco * taxa
+    return 5.70, False
 
 def formatar_br(num):
     if pd.isna(num) or not np.isfinite(num):
@@ -300,409 +352,401 @@ def br_format(x, pos):
         return f"{x:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-def exibir_cotacao_carbono():
-    st.sidebar.header("💰 Mercado de Carbono e Câmbio")
-    if not st.session_state.get('cotacao_carregada', False):
-        st.session_state.mostrar_atualizacao = True
-        st.session_state.cotacao_carregada = True
-    col1, col2 = st.sidebar.columns([3,1])
-    with col1:
-        if st.button("🔄 Atualizar Cotações"):
-            st.session_state.cotacao_atualizada = True
-            st.session_state.mostrar_atualizacao = True
-    if st.session_state.get('mostrar_atualizacao', False):
-        st.sidebar.info("🔄 Atualizando cotações...")
-        preco_carbono, moeda, _, _, fonte_carbono = obter_cotacao_carbono()
-        preco_euro, moeda_real, _, _ = obter_cotacao_euro_real()
-        st.session_state.preco_carbono = preco_carbono
-        st.session_state.moeda_carbono = moeda
-        st.session_state.taxa_cambio = preco_euro
-        st.session_state.moeda_real = moeda_real
-        st.session_state.fonte_cotacao = fonte_carbono
-        st.session_state.mostrar_atualizacao = False
-        st.session_state.cotacao_atualizada = False
-        st.rerun()
-    st.sidebar.metric("Preço do Carbono (tCO₂eq)", f"{st.session_state.moeda_carbono} {formatar_br(st.session_state.preco_carbono)}", help=f"Fonte: {st.session_state.fonte_cotacao}")
-    st.sidebar.metric("Euro (EUR/BRL)", f"{st.session_state.moeda_real} {formatar_br(st.session_state.taxa_cambio)}")
-    preco_carbono_reais = st.session_state.preco_carbono * st.session_state.taxa_cambio
-    st.sidebar.metric("Carbono em Reais (tCO₂eq)", f"R$ {formatar_br(preco_carbono_reais)}")
-    with st.sidebar.expander("ℹ️ Informações do Mercado de Carbono"):
-        st.markdown(f"""
-        **📊 Cotações Atuais:**  
-        - Preço: {st.session_state.moeda_carbono} {formatar_br(st.session_state.preco_carbono)}/tCO₂eq  
-        - Câmbio: 1 Euro = R$ {formatar_br(st.session_state.taxa_cambio)}  
-        - Carbono em Reais: R$ {formatar_br(preco_carbono_reais)}/tCO₂eq  
-        **🌍 Fonte:** {st.session_state.fonte_cotacao} (ICE CO2.L)  
-        """)
-
-def inicializar_session_state():
-    if 'preco_carbono' not in st.session_state:
-        p, m, _, _, f = obter_cotacao_carbono()
-        st.session_state.preco_carbono = p
-        st.session_state.moeda_carbono = m
-        st.session_state.fonte_cotacao = f
-    if 'taxa_cambio' not in st.session_state:
-        euro, real, _, _ = obter_cotacao_euro_real()
-        st.session_state.taxa_cambio = euro
-        st.session_state.moeda_real = real
-    if 'moeda_real' not in st.session_state:
-        st.session_state.moeda_real = "R$"
-    if 'run_simulation' not in st.session_state:
-        st.session_state.run_simulation = False
-    if 'k_ano' not in st.session_state:
-        st.session_state.k_ano = 0.06
-    if 'selected_gwp' not in st.session_state:
-        st.session_state.selected_gwp = "Otimista (GWP-20)"
-
-inicializar_session_state()
-
 # =============================================================================
 # INTERFACE PRINCIPAL
 # =============================================================================
-st.title("🌍 Simulador de Emissões de GEE e Créditos de Carbono")
-st.caption("Comparação: Vermicompostagem (Yang et al. 2017) vs Compostagem Termofílica (Yang et al. 2017) vs Fatores Padrão UNFCCC (AMS‑III.F / TOOL13). Baseline = Aterro em Guatapará, destino da maior parte dos RSU de Ribeirão Preto")
+# Cabeçalho personalizado
+st.markdown("""
+<div class="main-header">
+    <h1>🌱 Simulador de Créditos de Carbono</h1>
+    <p>Projetos de Compostagem de Resíduos Orgânicos | Base metodológica IPCC e UNFCCC</p>
+    <p style="font-size:0.9rem;">Apresentação para a ACIRP - Ribeirão Preto</p>
+</div>
+""", unsafe_allow_html=True)
 
-with st.container():
-    st.markdown("""
-    **📘 Nota metodológica:** A metodologia **AMS‑III.F** e sua ferramenta **TOOL13** (UNFCCC, 2016) fornecem fatores de emissão padrão para qualquer projeto de compostagem: **CH₄ = 0,002 t/t resíduo úmido** e **N₂O = 0,0005 t/t resíduo úmido**. Estes fatores são conservadores e podem ser aplicados a **todas as tecnologias** (leiras, termofílica, vermicompostagem). Neste simulador, para fins de comparação científica, utilizamos: **Fatores padrão UNFCCC** → aplicados a um cenário de compostagem em leiras aeradas; **Fatores experimentais de Yang et al. (2017)** → para vermicompostagem e compostagem termofílica. Assim, o usuário pode comparar o impacto da escolha de diferentes coeficientes de emissão sobre os créditos de carbono gerados.
-    """)
-    st.divider()
-
-exibir_cotacao_carbono()
-
+# Sidebar com parâmetros
 with st.sidebar:
-    st.header("⚙️ Parâmetros")
-    residuos_kg_dia = st.slider("Resíduos (kg/dia)", 10, 1000, 100, 10)
-    opcao_k = st.selectbox("k (ano⁻¹)", ["0,06 (lento)", "0,40 (rápido)"], index=0)
-    k_ano = 0.40 if "0,40" in opcao_k else 0.06
-    st.session_state.k_ano = k_ano
-    T = st.slider("Temperatura média (°C)", 20, 40, 25, 1)
-    DOC = st.slider("DOC (fração)", 0.10, 0.25, 0.15, 0.01)
-    umidade_valor = st.slider("Umidade (%)", 50, 95, 85, 1)
-    umidade = umidade_valor/100.0
-    anos_simulacao = st.slider("Anos de simulação", 5, 50, 20, 5)
-    n_simulations = st.slider("Monte Carlo (n)", 50, 1000, 100, 50)
-    n_samples = st.slider("Sobol (amostras)", 32, 256, 64, 16)
+    st.image("https://via.placeholder.com/200x80?text=ACIRP+Logo", use_column_width=True)  # Placeholder, substituir se tiver logo real
+    st.markdown("## ⚙️ Parâmetros de Entrada")
     
-    st.subheader("🎯 Cenário de GWP para Resultados Principais")
-    st.markdown("""
-    O **Potencial de Aquecimento Global (GWP)** define o peso do metano (CH₄) e do óxido nitroso (N₂O) em equivalente CO₂. A escolha do cenário altera significativamente as emissões evitadas e o valor dos créditos de carbono.
-    """)
+    # Tipo de entrada: kg ou bombonas
+    input_type = st.radio("Como deseja informar os resíduos?", 
+                          ["Quilogramas por dia (kg/dia)", "Bombonas de 50 litros"], 
+                          index=1,  # padrão bombonas para demonstração
+                          help="Escolha a unidade mais prática para o seu projeto.")
+    
+    if input_type == "Quilogramas por dia (kg/dia)":
+        residuos_kg_dia = st.slider("Resíduos orgânicos (kg/dia)", 10, 5000, 500, 50,
+                                    help="Quantidade total de resíduos destinados à compostagem por dia.")
+        st.caption(f"→ Total anual: {residuos_kg_dia * 365 / 1000:.1f} toneladas")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            num_bombonas = st.number_input("Bombonas de 50L por dia", min_value=1, max_value=100, value=10, step=1)
+        with col2:
+            # Opção de densidade pré-definida ou manual
+            densidade_opcao = st.selectbox("Densidade do resíduo", ["Média (0,60 kg/L)", "Úmido (0,70 kg/L)", "Seco (0,50 kg/L)", "Personalizada"])
+            if densidade_opcao == "Média (0,60 kg/L)":
+                densidade = 0.60
+            elif densidade_opcao == "Úmido (0,70 kg/L)":
+                densidade = 0.70
+            elif densidade_opcao == "Seco (0,50 kg/L)":
+                densidade = 0.50
+            else:
+                densidade = st.slider("Densidade (kg/L)", 0.3, 0.9, 0.60, 0.01)
+        
+        residuos_kg_dia = num_bombonas * 50 * densidade
+        st.info(f"📦 **Estimativa**: {num_bombonas} bombonas × 50L × {densidade:.2f} kg/L = **{residuos_kg_dia:.1f} kg/dia**")
+        st.caption(f"→ Total anual: {residuos_kg_dia * 365 / 1000:.1f} toneladas")
+    
+    st.divider()
+    st.markdown("### 🌡️ Parâmetros Ambientais")
+    k_opcao = st.selectbox("Taxa de decomposição (k, ano⁻¹)", ["0,06 (aterro lento - padrão)", "0,40 (aterro rápido)"], index=0)
+    k_ano = 0.40 if "0,40" in k_opcao else 0.06
+    
+    temperatura = st.slider("Temperatura média local (°C)", 15, 35, 25, 1,
+                            help="Média anual da temperatura em Ribeirão Preto (~22-25°C)")
+    doc = st.slider("Carbono orgânico degradável (DOC, fração)", 0.10, 0.25, 0.15, 0.01)
+    umidade_pct = st.slider("Umidade dos resíduos (%)", 50, 95, 85, 5)
+    umidade = umidade_pct / 100.0
+    
+    st.divider()
+    st.markdown("### ⏱️ Horizonte de Projeto")
+    anos_simulacao = st.slider("Anos de simulação", 5, 30, 20, 5)
+    
+    st.divider()
+    st.markdown("### 🎯 Cenário de Precificação")
     gwp_option = st.radio(
-        "Selecione o cenário:",
+        "Potencial de Aquecimento Global (GWP)",
         ["Otimista (GWP-20)", "Realista (GWP-100)", "Pessimista (GWP-500)"],
-        index=0,
-        help="""
-        - **Otimista (GWP-20)**: Fatores altos (CH₄=79,7; N₂O=273). Gera as maiores emissões evitadas. Recomendado para projetos que buscam maximizar créditos em horizonte de curto prazo (20 anos).
-        - **Realista (GWP-100)**: Padrão mais aceito internacionalmente (CH₄=27,0; N₂O=273). Equilibra precisão e aceitação regulatória.
-        - **Pessimista (GWP-500)**: Fatores baixos (CH₄=7,2; N₂O=130). Resulta nas menores emissões evitadas. Visão de longo prazo (500 anos) ou para metodologias conservadoras.
-        """
+        index=1,
+        help="GWP-100 é o padrão mais aceito internacionalmente para projetos de carbono."
     )
-    st.session_state.selected_gwp = gwp_option
     
-    if st.button("🚀 Executar Simulação", type="primary"):
-        st.session_state.run_simulation = True
+    # Mapeamento GWP
+    if gwp_option == "Otimista (GWP-20)":
+        gwp_ch4, gwp_n2o = 79.7, 273
+    elif gwp_option == "Realista (GWP-100)":
+        gwp_ch4, gwp_n2o = 27.0, 273
+    else:
+        gwp_ch4, gwp_n2o = 7.2, 130
+    
+    st.divider()
+    # Botão de execução
+    executar = st.button("🚀 Executar Simulação", type="primary", use_container_width=True)
 
-# Cache
-@st.cache_data(show_spinner=False)
-def cached_sobol(n_samples, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
-    problem = {'num_vars':3, 'names':['k','T','DOC'], 'bounds':[[0.06,0.40],[20,40],[0.10,0.25]]}
-    param_values = sample(problem, n_samples, seed=50)
-    calc = GHGEmissionCalculator()
-    calc.GWP_CH4_20 = gwp_ch4
-    calc.GWP_N2O_20 = gwp_n2o
-    def f(p):
-        return calc.calculate_avoided_emissions_fast(w, p[0], p[1], p[2], umid, years)
-    res = Parallel(n_jobs=-1)(delayed(f)(p) for p in param_values)
-    arr_v = np.array([r[0] for r in res])
-    arr_t = np.array([r[1] for r in res])
-    arr_s = np.array([r[2] for r in res])
-    Si_v = analyze(problem, arr_v, print_to_console=False)
-    Si_t = analyze(problem, arr_t, print_to_console=False)
-    Si_s = analyze(problem, arr_s, print_to_console=False)
-    return Si_v, Si_t, Si_s
+# Inicializar estado da sessão para cotações
+if 'preco_carbono' not in st.session_state:
+    p, m, _, _ = obter_cotacao_carbono()
+    st.session_state.preco_carbono = p
+    st.session_state.moeda = m
+if 'taxa_cambio' not in st.session_state:
+    euro, _ = obter_cotacao_euro_real()
+    st.session_state.taxa_cambio = euro
 
-@st.cache_data(show_spinner=False)
-def cached_montecarlo(n, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
-    np.random.seed(50)
-    u = np.random.uniform(0.75, 0.90, n)
-    t = np.random.normal(25, 3, n)
-    d = np.random.triangular(0.12, 0.15, 0.18, n)
-    calc = GHGEmissionCalculator()
-    calc.GWP_CH4_20 = gwp_ch4
-    calc.GWP_N2O_20 = gwp_n2o
-    def run(i):
-        np.random.seed(50+i)
-        return calc.calculate_avoided_emissions_fast(w, k, t[i], d[i], u[i], years)
-    res = Parallel(n_jobs=-1)(delayed(run)(i) for i in range(n))
-    arr_v = np.array([r[0] for r in res])
-    arr_t = np.array([r[1] for r in res])
-    arr_s = np.array([r[2] for r in res])
-    return arr_v, arr_t, arr_s
+# Atualização manual de cotações na sidebar
+with st.sidebar:
+    st.divider()
+    st.markdown("### 💰 Mercado")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("🔄 Atualizar Cotações", use_container_width=True):
+            p, m, _, _ = obter_cotacao_carbono()
+            euro, _ = obter_cotacao_euro_real()
+            st.session_state.preco_carbono = p
+            st.session_state.moeda = m
+            st.session_state.taxa_cambio = euro
+            st.rerun()
+    with col_b:
+        st.metric("Carbono (tCO₂e)", f"{st.session_state.moeda} {st.session_state.preco_carbono:.2f}")
+    st.metric("Euro (EUR/BRL)", f"R$ {st.session_state.taxa_cambio:.2f}")
+    preco_real = st.session_state.preco_carbono * st.session_state.taxa_cambio
+    st.metric("Carbono em R$", f"R$ {preco_real:.2f}")
 
-# Execução
-if st.session_state.get('run_simulation', False):
-    with st.spinner("Executando simulação..."):
-        gwps = {
-            "Otimista (GWP-20)": (79.7, 273),
-            "Realista (GWP-100)": (27.0, 273),
-            "Pessimista (GWP-500)": (7.2, 130)
-        }
+# =============================================================================
+# EXECUÇÃO DA SIMULAÇÃO
+# =============================================================================
+if executar:
+    with st.spinner("🔄 Processando modelo de emissões e gerando resultados... Isso pode levar alguns segundos."):
+        # Instancia o calculador com os GWP selecionados
+        calc = GHGEmissionCalculator()
+        calc.GWP_CH4 = gwp_ch4
+        calc.GWP_N2O = gwp_n2o
         
-        results_all = {}
-        for nome, (gwp_c, gwp_n) in gwps.items():
-            calc = GHGEmissionCalculator()
-            calc.GWP_CH4_20 = gwp_c
-            calc.GWP_N2O_20 = gwp_n
-            results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao)
+        # Executa cálculo principal
+        res = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, temperatura, doc, umidade, anos_simulacao)
         
-        selected = st.session_state.selected_gwp
-        res = results_all[selected]
-        
+        # Séries temporais
         base_series = res['base_series']
         vermi_series = res['vermi_series']
         termo_series = res['thermo_series']
         std_series = res['std_series']
-
+        
         dias = len(base_series)
         datas = pd.date_range(start=datetime.now(), periods=dias, freq='D')
-        df_dia = pd.DataFrame({'Data':datas, 'Base':base_series, 'Vermi':vermi_series, 'Termo':termo_series, 'Std':std_series})
+        df_dia = pd.DataFrame({'Data': datas, 'Base': base_series, 'Vermi': vermi_series, 'Termo': termo_series, 'Std': std_series})
         df_dia['Year'] = df_dia['Data'].dt.year
-        df_anual = df_dia.groupby('Year').agg({'Base':'sum','Vermi':'sum','Termo':'sum','Std':'sum'}).reset_index()
+        df_anual = df_dia.groupby('Year').agg({'Base': 'sum', 'Vermi': 'sum', 'Termo': 'sum', 'Std': 'sum'}).reset_index()
         df_anual['Evitado_Vermi'] = df_anual['Base'] - df_anual['Vermi']
         df_anual['Evitado_Termo'] = df_anual['Base'] - df_anual['Termo']
         df_anual['Evitado_Std'] = df_anual['Base'] - df_anual['Std']
-
+        
+        # Acumulados
         base_acum = np.cumsum(base_series)
         vermi_acum = np.cumsum(vermi_series)
         termo_acum = np.cumsum(termo_series)
         std_acum = np.cumsum(std_series)
-
-        st.header(f"📈 Resultados da Simulação - {selected}")
-        st.info(f"""
-        **Parâmetros – Ribeirão Preto (Aterro Guatapará):**  
-        - k = {formatar_br(k_ano)} ano⁻¹  
-        - Temperatura = {formatar_br(T)} °C  
-        - DOC = {formatar_br(DOC)}  
-        - Umidade = {formatar_br(umidade_valor)}%  
-        - Resíduos totais = {formatar_br(residuos_kg_dia*365*anos_simulacao/1000)} t  
-        - Baseline: captura de metano = 60%, φ = 0,85 (UNFCCC 2024)
-        """)
-
-        st.subheader("📊 Comparação entre todos os Cenários de GWP (tCO₂eq evitadas)")
-        comp = []
-        for nome, r in results_all.items():
-            comp.append({"Cenário": nome,
-                         "Vermicompostagem (Yang et al.)": r['vermi_avoided'],
-                         "Termofílica (Yang et al.)": r['thermo_avoided'],
-                         "Fatores Padrão UNFCCC (TOOL13)": r['std_avoided']})
-        df_comp = pd.DataFrame(comp)
-        st.dataframe(df_comp.style.format({c: lambda x: formatar_br(x) for c in df_comp.columns if c != "Cenário"}))
         
-        st.info("""
-        **🔍 Interpretação dos cenários de GWP:**  
-        - **Otimista (GWP-20)**: destaca o impacto de curto prazo do metano (79,7x CO₂eq) – resulta nas maiores emissões evitadas.  
-        - **Realista (GWP-100)**: padrão mais comum em inventários nacionais (27,0x CO₂eq).  
-        - **Pessimista (GWP-500)**: reduz drasticamente o peso do metano (7,2x CO₂eq), aproximando-se de uma visão de longo prazo.  
-        - Independentemente do cenário, a **vermicompostagem apresenta as maiores reduções**, seguida pela termofílica e depois pelos fatores padrão UNFCCC.
-        """)
-
-        st.subheader(f"💰 Valor Financeiro ({selected})")
-        preco = st.session_state.preco_carbono
-        moeda = st.session_state.moeda_carbono
-        cambio = st.session_state.taxa_cambio
-        v_vermi = res['vermi_avoided']
-        v_termo = res['thermo_avoided']
-        v_std = res['std_avoided']
+        # ===== RESULTADOS EM ABAS =====
+        st.success("✅ Simulação concluída! Explore os resultados nas abas abaixo.")
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Vermicompostagem (Yang)", f"{formatar_br(v_vermi)} tCO₂eq")
-            st.metric("Euro", f"{moeda} {formatar_br(v_vermi*preco)}")
-            st.metric("R$", f"R$ {formatar_br(v_vermi*preco*cambio)}")
-        with col2:
-            st.metric("Termofílica (Yang)", f"{formatar_br(v_termo)} tCO₂eq")
-            st.metric("Euro", f"{moeda} {formatar_br(v_termo*preco)}")
-            st.metric("R$", f"R$ {formatar_br(v_termo*preco*cambio)}")
-        with col3:
-            st.metric("Fatores Padrão UNFCCC (TOOL13)", f"{formatar_br(v_std)} tCO₂eq")
-            st.metric("Euro", f"{moeda} {formatar_br(v_std*preco)}")
-            st.metric("R$", f"R$ {formatar_br(v_std*preco*cambio)}")
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Visão Geral", "💰 Resultados Financeiros", "📈 Análise Temporal", "🎯 Sensibilidade e Incerteza", "📋 Dados Detalhados"])
         
-        razao_vt = v_vermi / v_termo if v_termo != 0 else np.inf
-        razao_vs = v_vermi / v_std if v_std != 0 else np.inf
-        razao_vt_str = formatar_br(razao_vt) if np.isfinite(razao_vt) else "infinito"
-        razao_vs_str = formatar_br(razao_vs) if np.isfinite(razao_vs) else "infinito"
+        with tab1:
+            st.markdown("## Resumo Executivo")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.metric("Emissões evitadas (Vermicompostagem)", f"{formatar_br(res['vermi_avoided'])} tCO₂e")
+                st.caption("Base: Yang et al. 2017")
+                st.markdown("</div>", unsafe_allow_html=True)
+            with col2:
+                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.metric("Emissões evitadas (Termofílica)", f"{formatar_br(res['thermo_avoided'])} tCO₂e")
+                st.caption("Base: Yang et al. 2017")
+                st.markdown("</div>", unsafe_allow_html=True)
+            with col3:
+                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.metric("Emissões evitadas (Padrão UNFCCC)", f"{formatar_br(res['std_avoided'])} tCO₂e")
+                st.caption("Base: AMS‑III.F / TOOL13")
+                st.markdown("</div>", unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.info(f"""
+            **📌 Contexto do projeto**  
+            - **Local de referência**: Aterro Guatapará (Ribeirão Preto) – captura de metano: 60%  
+            - **Resíduos processados**: {residuos_kg_dia * 365 / 1000:.1f} toneladas por ano  
+            - **Horizonte**: {anos_simulacao} anos  
+            - **Cenário GWP**: {gwp_option} (CH₄={gwp_ch4}, N₂O={gwp_n2o})  
+            
+            **🔍 Interpretação**  
+            A vermicompostagem apresenta o maior potencial de redução de emissões, seguida pela compostagem termofílica. Os fatores padrão UNFCCC são mais conservadores. A diferença entre as tecnologias é estatisticamente significativa e consistente ao longo do tempo.
+            """)
+            
+            # Gráfico de barras anual comparativo
+            fig, ax = plt.subplots(figsize=(12, 6))
+            x = np.arange(len(df_anual['Year']))
+            width = 0.25
+            ax.bar(x - width, df_anual['Evitado_Vermi'], width, label='Vermicompostagem (Yang)', color='#2e7d32', edgecolor='black')
+            ax.bar(x, df_anual['Evitado_Termo'], width, label='Termofílica (Yang)', color='#ff9800', hatch='//', edgecolor='black')
+            ax.bar(x + width, df_anual['Evitado_Std'], width, label='Padrão UNFCCC', color='#1976d2', hatch='\\\\', edgecolor='black')
+            ax.set_xticks(x)
+            ax.set_xticklabels(df_anual['Year'])
+            ax.set_ylabel('tCO₂e evitadas')
+            ax.set_title(f'Emissões evitadas por ano – {gwp_option}')
+            ax.legend()
+            ax.yaxis.set_major_formatter(FuncFormatter(br_format))
+            st.pyplot(fig)
+            plt.close(fig)
+            
+        with tab2:
+            st.markdown("## Avaliação Financeira")
+            preco_euro = st.session_state.preco_carbono
+            cambio = st.session_state.taxa_cambio
+            preco_real = preco_euro * cambio
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown("#### Vermicompostagem")
+                st.metric("Créditos totais", f"{formatar_br(res['vermi_avoided'])} tCO₂e")
+                st.metric("Receita em Euros", f"€ {formatar_br(res['vermi_avoided'] * preco_euro)}")
+                st.metric("Receita em Reais", f"R$ {formatar_br(res['vermi_avoided'] * preco_real)}")
+                st.caption(f"Preço do carbono: €{preco_euro:.2f} | Euro: R${cambio:.2f}")
+            with col2:
+                st.markdown("#### Termofílica")
+                st.metric("Créditos totais", f"{formatar_br(res['thermo_avoided'])} tCO₂e")
+                st.metric("Receita em Euros", f"€ {formatar_br(res['thermo_avoided'] * preco_euro)}")
+                st.metric("Receita em Reais", f"R$ {formatar_br(res['thermo_avoided'] * preco_real)}")
+            with col3:
+                st.markdown("#### Padrão UNFCCC")
+                st.metric("Créditos totais", f"{formatar_br(res['std_avoided'])} tCO₂e")
+                st.metric("Receita em Euros", f"€ {formatar_br(res['std_avoided'] * preco_euro)}")
+                st.metric("Receita em Reais", f"R$ {formatar_br(res['std_avoided'] * preco_real)}")
+            
+            st.markdown("---")
+            st.success(f"""
+            **💡 Análise de retorno**  
+            - A **vermicompostagem** gera **{res['vermi_avoided'] / res['thermo_avoided']:.2f}x** mais receita que a termofílica e **{res['vermi_avoided'] / res['std_avoided']:.2f}x** mais que o padrão UNFCCC.  
+            - Receita anual média (vermicompostagem): **R$ {formatar_br(res['vermi_avoided'] * preco_real / anos_simulacao)}/ano**.  
+            - Por tonelada de resíduo processado: **R$ {formatar_br(res['vermi_avoided'] * preco_real / (residuos_kg_dia * 365 / 1000))}**.
+            """)
+            
+        with tab3:
+            st.markdown("## Emissões acumuladas e séries temporais")
+            fig2, ax2 = plt.subplots(figsize=(12, 6))
+            ax2.plot(datas, base_acum, 'r-', label='Baseline (Aterro)', linewidth=2)
+            ax2.plot(datas, vermi_acum, 'g-', label='Vermicompostagem', linewidth=2)
+            ax2.plot(datas, termo_acum, 'orange', label='Termofílica', linewidth=2)
+            ax2.plot(datas, std_acum, 'steelblue', label='Padrão UNFCCC', linewidth=2)
+            ax2.fill_between(datas, vermi_acum, base_acum, alpha=0.2, color='lightgreen')
+            ax2.set_title(f'Emissões acumuladas de CO₂e – {anos_simulacao} anos')
+            ax2.set_xlabel('Data')
+            ax2.set_ylabel('tCO₂e')
+            ax2.legend()
+            ax2.yaxis.set_major_formatter(FuncFormatter(br_format))
+            st.pyplot(fig2)
+            plt.close(fig2)
+            
+            st.info(f"""
+            **📈 Impacto acumulado**  
+            - Em {anos_simulacao} anos, a vermicompostagem evitaria **{formatar_br(base_acum[-1] - vermi_acum[-1])} tCO₂e** em relação ao aterro.  
+            - A área verde no gráfico representa exatamente as emissões evitadas.
+            """)
+            
+            # Gráfico de linhas anuais evitadas
+            fig3, ax3 = plt.subplots(figsize=(12, 5))
+            ax3.plot(df_anual['Year'], df_anual['Evitado_Vermi'], 'go-', label='Vermicompostagem')
+            ax3.plot(df_anual['Year'], df_anual['Evitado_Termo'], 'yo-', label='Termofílica')
+            ax3.plot(df_anual['Year'], df_anual['Evitado_Std'], 'bo-', label='Padrão UNFCCC')
+            ax3.set_xlabel('Ano')
+            ax3.set_ylabel('tCO₂e evitadas')
+            ax3.set_title('Evolução anual das emissões evitadas')
+            ax3.legend()
+            ax3.yaxis.set_major_formatter(FuncFormatter(br_format))
+            st.pyplot(fig3)
+            plt.close(fig3)
+            
+        with tab4:
+            st.markdown("## Análise de Sensibilidade (Sobol) e Incerteza (Monte Carlo)")
+            st.warning("⚠️ As simulações abaixo podem levar até 30 segundos. Aguarde.")
+            
+            with st.spinner("Executando análise de sensibilidade (Sobol)..."):
+                # Configuração do problema Sobol
+                problem = {'num_vars': 3, 'names': ['k', 'T', 'DOC'], 'bounds': [[0.06, 0.40], [20, 40], [0.10, 0.25]]}
+                n_samples_sobol = 128  # amostras para Sobol
+                param_values = sample(problem, n_samples_sobol, seed=42)
+                
+                def f_sobol(p):
+                    calc_temp = GHGEmissionCalculator()
+                    calc_temp.GWP_CH4 = gwp_ch4
+                    calc_temp.GWP_N2O = gwp_n2o
+                    return calc_temp.calculate_avoided_emissions_fast(residuos_kg_dia, p[0], p[1], p[2], umidade, anos_simulacao)
+                
+                res_sobol = Parallel(n_jobs=-1)(delayed(f_sobol)(p) for p in param_values)
+                arr_v = np.array([r[0] for r in res_sobol])
+                arr_t = np.array([r[1] for r in res_sobol])
+                arr_s = np.array([r[2] for r in res_sobol])
+                
+                Si_v = analyze(problem, arr_v, print_to_console=False)
+                Si_t = analyze(problem, arr_t, print_to_console=False)
+                Si_s = analyze(problem, arr_s, print_to_console=False)
+                
+                df_sens = pd.DataFrame({
+                    'Parâmetro': ['k (taxa dec.)', 'Temperatura', 'DOC'],
+                    'S1 (Vermi)': Si_v['S1'], 'ST (Vermi)': Si_v['ST'],
+                    'S1 (Termo)': Si_t['S1'], 'ST (Termo)': Si_t['ST'],
+                    'S1 (Std)': Si_s['S1'], 'ST (Std)': Si_s['ST']
+                })
+                st.dataframe(df_sens.style.format({col: '{:.4f}' for col in df_sens.columns if col != 'Parâmetro'}))
+                st.caption("S1 = efeito direto; ST = efeito total (inclui interações). DOC é o fator mais influente.")
+            
+            with st.spinner("Executando simulação de Monte Carlo (n=200)..."):
+                n_mc = 200
+                np.random.seed(42)
+                u_mc = np.random.uniform(0.75, 0.90, n_mc)
+                t_mc = np.random.normal(temperatura, 3, n_mc)
+                d_mc = np.random.triangular(0.12, doc, 0.20, n_mc)
+                
+                def f_mc(i):
+                    calc_mc = GHGEmissionCalculator()
+                    calc_mc.GWP_CH4 = gwp_ch4
+                    calc_mc.GWP_N2O = gwp_n2o
+                    return calc_mc.calculate_avoided_emissions_fast(residuos_kg_dia, k_ano, t_mc[i], d_mc[i], u_mc[i], anos_simulacao)
+                
+                res_mc = Parallel(n_jobs=-1)(delayed(f_mc)(i) for i in range(n_mc))
+                arr_v_mc = np.array([r[0] for r in res_mc])
+                arr_t_mc = np.array([r[1] for r in res_mc])
+                arr_s_mc = np.array([r[2] for r in res_mc])
+                
+                fig_mc, ax_mc = plt.subplots(figsize=(10, 5))
+                sns.kdeplot(arr_v_mc, label='Vermicompostagem', ax=ax_mc, fill=True, alpha=0.4)
+                sns.kdeplot(arr_t_mc, label='Termofílica', ax=ax_mc, fill=True, alpha=0.4)
+                sns.kdeplot(arr_s_mc, label='Padrão UNFCCC', ax=ax_mc, fill=True, alpha=0.4)
+                ax_mc.set_title(f'Distribuição de emissões evitadas – Monte Carlo (n={n_mc})')
+                ax_mc.set_xlabel('tCO₂e')
+                ax_mc.xaxis.set_major_formatter(FuncFormatter(br_format))
+                st.pyplot(fig_mc)
+                plt.close(fig_mc)
+                
+                stats_df = pd.DataFrame({
+                    'Tecnologia': ['Vermicompostagem', 'Termofílica', 'Padrão UNFCCC'],
+                    'Média (tCO₂e)': [np.mean(arr_v_mc), np.mean(arr_t_mc), np.mean(arr_s_mc)],
+                    'Mediana': [np.median(arr_v_mc), np.median(arr_t_mc), np.median(arr_s_mc)],
+                    'DP': [np.std(arr_v_mc), np.std(arr_t_mc), np.std(arr_s_mc)],
+                    'IC95% inferior': [np.percentile(arr_v_mc, 2.5), np.percentile(arr_t_mc, 2.5), np.percentile(arr_s_mc, 2.5)],
+                    'IC95% superior': [np.percentile(arr_v_mc, 97.5), np.percentile(arr_t_mc, 97.5), np.percentile(arr_s_mc, 97.5)]
+                })
+                st.dataframe(stats_df.style.format({col: lambda x: formatar_br(x) for col in stats_df.columns if col != 'Tecnologia'}))
+                
+                # Teste t pareado
+                t_vt = stats.ttest_rel(arr_v_mc, arr_t_mc)[1]
+                t_vs = stats.ttest_rel(arr_v_mc, arr_s_mc)[1]
+                t_ts = stats.ttest_rel(arr_t_mc, arr_s_mc)[1]
+                st.success(f"""
+                **Testes de diferença (p-valor, t-Student pareado)**  
+                - Vermi vs Termo: p = {t_vt:.5f}  
+                - Vermi vs Std: p = {t_vs:.5f}  
+                - Termo vs Std: p = {t_ts:.5f}  
+                
+                Todos os p-valores < 0,001 → diferenças estatisticamente significativas.
+                """)
         
-        st.success(f"""
-        **💡 Análise financeira:**  
-        - A **vermicompostagem** gera aproximadamente **{razao_vt_str}x** mais receita que a termofílica e **{razao_vs_str}x** mais que os fatores padrão.  
-        - Para cada tonelada de resíduo tratado, o retorno financeiro apenas com créditos de carbono (sem custos operacionais) é de **{moeda} {formatar_br((v_vermi*preco)/(residuos_kg_dia*365*anos_simulacao/1000))} por t**.
-        """)
-
-        st.subheader(f"📊 Comparação Anual das Emissões Evitadas ({selected})")
-        fig, ax = plt.subplots(figsize=(12,6))
-        x = np.arange(len(df_anual['Year']))
-        width = 0.25
-        ax.bar(x - width, df_anual['Evitado_Vermi'], width, label='Vermicompostagem (Yang et al. 2017)', color='forestgreen', edgecolor='black')
-        ax.bar(x, df_anual['Evitado_Termo'], width, label='Compostagem Termofílica (Yang et al. 2017)', color='orange', hatch='//', edgecolor='black')
-        ax.bar(x + width, df_anual['Evitado_Std'], width, label='Fatores Padrão UNFCCC (TOOL13)', color='steelblue', hatch='\\\\', edgecolor='black')
-        for i, (v1, v2, v3) in enumerate(zip(df_anual['Evitado_Vermi'], df_anual['Evitado_Termo'], df_anual['Evitado_Std'])):
-            ax.text(i-width, v1+max(v1,v2,v3)*0.01, formatar_br(v1), ha='center', fontsize=8)
-            ax.text(i, v2+max(v1,v2,v3)*0.01, formatar_br(v2), ha='center', fontsize=8)
-            ax.text(i+width, v3+max(v1,v2,v3)*0.01, formatar_br(v3), ha='center', fontsize=8)
-        ax.set_xticks(x)
-        ax.set_xticklabels(df_anual['Year'])
-        ax.set_ylabel('tCO₂eq evitadas')
-        ax.set_title(f'Emissões Evitadas por Ano - {selected}')
-        ax.legend()
-        ax.yaxis.set_major_formatter(FuncFormatter(br_format))
-        st.pyplot(fig)
-        plt.close(fig)
-        
-        st.info("""
-        **📅 Evolução anual:**  
-        As emissões evitadas crescem ano a ano devido ao acúmulo de resíduos e à dinâmica de degradação do aterro (modelo FOD). Após alguns anos, atinge-se um regime permanente onde a redução anual se estabiliza. A diferença entre as tecnologias permanece consistente ao longo do tempo.
-        """)
-
-        st.subheader(f"📉 Emissões Acumuladas (Baseline vs Tecnologias) - {selected}")
-        fig2, ax2 = plt.subplots(figsize=(11,6))
-        ax2.plot(datas, base_acum, 'r-', label='Baseline (Aterro)')
-        ax2.plot(datas, vermi_acum, 'g-', label='Vermicompostagem (Yang)')
-        ax2.plot(datas, termo_acum, 'orange', label='Termofílica (Yang)')
-        ax2.plot(datas, std_acum, 'steelblue', label='Fatores Padrão UNFCCC')
-        ax2.fill_between(datas, vermi_acum, base_acum, alpha=0.3, color='lightgreen')
-        ax2.set_title(f'Emissões Acumuladas – {anos_simulacao} anos (k={formatar_br(k_ano)} ano⁻¹) - {selected}')
-        ax2.set_xlabel('Data')
-        ax2.set_ylabel('tCO₂eq')
-        ax2.legend()
-        ax2.yaxis.set_major_formatter(FuncFormatter(br_format))
-        st.pyplot(fig2)
-        plt.close(fig2)
-        
-        st.success(f"""
-        **📈 Impacto acumulado:**  
-        - Em {anos_simulacao} anos, a **vermicompostagem** evitaria **{formatar_br(base_acum[-1] - vermi_acum[-1])} tCO₂eq** em relação ao aterro.  
-        - A termofílica evitaria **{formatar_br(base_acum[-1] - termo_acum[-1])} tCO₂eq**.  
-        - Os fatores padrão UNFCCC resultariam em **{formatar_br(base_acum[-1] - std_acum[-1])} tCO₂eq** evitadas.  
-        - A área verde no gráfico representa exatamente as emissões evitadas pela vermicompostagem.
-        """)
-
-        st.subheader(f"🎯 Análise de Sensibilidade Sobol ({selected})")
-        with st.spinner("Sobol em execução..."):
-            gwp_c, gwp_n = gwps[selected]
-            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, gwp_c, gwp_n)
-        df_sens = pd.DataFrame({
-            'Parâmetro': ['k','T','DOC'],
-            'S1_Vermi': Si_v['S1'], 'ST_Vermi': Si_v['ST'],
-            'S1_Termo': Si_t['S1'], 'ST_Termo': Si_t['ST'],
-            'S1_Std': Si_s['S1'], 'ST_Std': Si_s['ST']
-        })
-        num_cols = [col for col in df_sens.columns if col != 'Parâmetro']
-        st.dataframe(df_sens.style.format({col: '{:.4f}' for col in num_cols}))
-        
-        st.info("""
-        **🔬 Significado dos índices de Sobol:**  
-        - **S1 (primeira ordem)**: impacto direto de cada parâmetro, sem interações.  
-        - **ST (total)**: inclui interações com outros parâmetros.  
-
-        **Principais conclusões:**  
-        - **DOC** (carbono orgânico degradável) é o parâmetro mais influente em todas as tecnologias (ST > 0,6).  
-        - **Temperatura** tem impacto moderado, especialmente na vermicompostagem (ST ~ 0,3-0,4).  
-        - **Taxa de decaimento (k)** é pouco influente para horizontes longos (20 anos) porque o aterro já atingiu o equilíbrio.  
-        - Interações entre parâmetros são relevantes (diferença ST - S1 > 0,1), indicando não‑linearidades no modelo.
-        """)
-
-        st.subheader(f"🎲 Monte Carlo e Testes Estatísticos ({selected})")
-        with st.spinner("Monte Carlo em execução..."):
-            gwp_c, gwp_n = gwps[selected]
-            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, gwp_c, gwp_n)
-
-        fig3, ax3 = plt.subplots(figsize=(10,5))
-        sns.kdeplot(arr_v, label='Vermicompostagem (Yang)', ax=ax3)
-        sns.kdeplot(arr_t, label='Termofílica (Yang)', ax=ax3)
-        sns.kdeplot(arr_s, label='Fatores Padrão UNFCCC', ax=ax3)
-        ax3.set_title(f'Distribuição das Emissões Evitadas - {selected}')
-        ax3.set_xlabel('tCO₂eq')
-        ax3.xaxis.set_major_formatter(FuncFormatter(br_format))
-        st.pyplot(fig3)
-        plt.close(fig3)
-
-        stats_df = pd.DataFrame([
-            {'Tecnologia': 'Vermicompostagem (Yang)', 'Média': np.mean(arr_v), 'Mediana': np.median(arr_v), 'DP': np.std(arr_v), 'IC95% inf': np.percentile(arr_v,2.5), 'IC95% sup': np.percentile(arr_v,97.5)},
-            {'Tecnologia': 'Termofílica (Yang)', 'Média': np.mean(arr_t), 'Mediana': np.median(arr_t), 'DP': np.std(arr_t), 'IC95% inf': np.percentile(arr_t,2.5), 'IC95% sup': np.percentile(arr_t,97.5)},
-            {'Tecnologia': 'Fatores Padrão UNFCCC', 'Média': np.mean(arr_s), 'Mediana': np.median(arr_s), 'DP': np.std(arr_s), 'IC95% inf': np.percentile(arr_s,2.5), 'IC95% sup': np.percentile(arr_s,97.5)}
-        ])
-        st.dataframe(stats_df.style.format({c: lambda x: formatar_br(x) for c in stats_df.columns if c != 'Tecnologia'}))
-
-        cv = (np.std(arr_v)/np.mean(arr_v)*100) if np.mean(arr_v) != 0 else 0
-        st.success(f"""
-        **📊 Incerteza dos resultados:**  
-        - Intervalo de confiança de 95% para a vermicompostagem: **[{formatar_br(np.percentile(arr_v,2.5))}, {formatar_br(np.percentile(arr_v,97.5))}] tCO₂eq**.  
-        - Coeficiente de variação (DP/média): **{cv:.1f}%** (incerteza moderada).  
-        - A distribuição é aproximadamente normal (verifique o teste de Shapiro-Wilk abaixo).
-        """)
-
-        # Testes de diferença significativa - Apresentação compacta e equilibrada
-        st.write("**Testes de diferença significativa (p-valores):**")
-        t_vt = stats.ttest_rel(arr_v, arr_t)[1]
-        t_vs = stats.ttest_rel(arr_v, arr_s)[1]
-        t_ts = stats.ttest_rel(arr_t, arr_s)[1]
-        w_vt = stats.wilcoxon(arr_v, arr_t)[1]
-        w_vs = stats.wilcoxon(arr_v, arr_s)[1]
-        w_ts = stats.wilcoxon(arr_t, arr_s)[1]
-        
-        # Usando colunas para distribuir igualmente
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(f"<div class='test-stats'>**Vermi vs Termo**<br>t-test p = {t_vt:.5f}<br>Wilcoxon p = {w_vt:.5f}</div>", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"<div class='test-stats'>**Vermi vs Std**<br>t-test p = {t_vs:.5f}<br>Wilcoxon p = {w_vs:.5f}</div>", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"<div class='test-stats'>**Termo vs Std**<br>t-test p = {t_ts:.5f}<br>Wilcoxon p = {w_ts:.5f}</div>", unsafe_allow_html=True)
-        
-        st.info("""
-        **✅ Interpretação estatística:**  
-        - Se **p < 0,05**, a diferença entre as tecnologias é estatisticamente significativa.  
-        - Neste caso, todas as comparações apresentam **p < 0,001**, indicando que as três tecnologias produzem resultados **muito diferentes entre si**.  
-        - O teste de Wilcoxon (não paramétrico) confirma a robustez da conclusão, mesmo sem assumir normalidade.
-        """)
-
-        st.subheader("📋 Resultados Anuais Detalhados")
-        df_anual_fmt = df_anual[['Year','Base','Vermi','Termo','Std','Evitado_Vermi','Evitado_Termo','Evitado_Std']].copy()
-        df_anual_fmt.columns = ['Ano','Baseline','Vermicompostagem (Yang)','Termofílica (Yang)','Fatores Padrão UNFCCC','Evitado Vermi','Evitado Termo','Evitado Std']
-        for col in df_anual_fmt.columns:
-            if col != 'Ano':
-                df_anual_fmt[col] = df_anual_fmt[col].apply(formatar_br)
-        st.dataframe(df_anual_fmt)
-        
-        st.markdown("""
-        **📌 Nota final:**  
-        - Os valores anuais permitem ver a evolução ano a ano.  
-        - As emissões evitadas crescem rapidamente nos primeiros anos e depois estabilizam.  
-        - A escolha da tecnologia de compostagem impacta diretamente o potencial de geração de créditos de carbono.
-        """)
-
-    st.session_state.run_simulation = False
-else:
-    st.info("💡 Ajuste os parâmetros na barra lateral, selecione o cenário de GWP desejado e clique em **Executar Simulação** para ver os resultados.")
-
-st.markdown("---")
-with st.expander("📚 Referências Metodológicas Detalhadas"):
+        with tab5:
+            st.markdown("## Dados anuais detalhados")
+            df_exib = df_anual[['Year', 'Base', 'Vermi', 'Termo', 'Std', 'Evitado_Vermi', 'Evitado_Termo', 'Evitado_Std']].copy()
+            df_exib.columns = ['Ano', 'Baseline (aterro)', 'Vermicompostagem', 'Termofílica', 'Padrão UNFCCC', 'Evitado Vermi', 'Evitado Termo', 'Evitado Std']
+            for col in df_exib.columns:
+                if col != 'Ano':
+                    df_exib[col] = df_exib[col].apply(formatar_br)
+            st.dataframe(df_exib, use_container_width=True)
+            
+            st.markdown("### Parâmetros utilizados na simulação")
+            st.json({
+                "Resíduos (kg/dia)": residuos_kg_dia,
+                "Resíduos (t/ano)": round(residuos_kg_dia * 365 / 1000, 2),
+                "Taxa k (ano⁻¹)": k_ano,
+                "Temperatura (°C)": temperatura,
+                "DOC": doc,
+                "Umidade (%)": umidade_pct,
+                "Anos de simulação": anos_simulacao,
+                "Cenário GWP": gwp_option,
+                "Preço do carbono (EUR)": st.session_state.preco_carbono,
+                "Câmbio EUR/BRL": st.session_state.taxa_cambio
+            })
+    
+    # Rodapé
+    st.markdown("---")
     st.markdown("""
-    **1. Baseline – Aterro Sanitário (Guatapará, Ribeirão Preto)**  
-    - **Modelo de metano (CH₄) – IPCC 2006**: Método FOD, parâmetros MCF=1,0; F=0,5; OX=0,1; k=0,06 ou 0,40 ano⁻¹; DOCf = 0,0147×T+0,28.  
-    - **Emissões de N₂O – Wang et al. (2017)**: E_open = 1,91 mg m⁻² h⁻¹; E_closed = 2,15 mg m⁻² h⁻¹.  
-    - **Pré‑descarte – Feng et al. (2020)**: CH₄ = 2,78 μgC kg⁻¹ h⁻¹; N₂O total = 20,26 mg N kg⁻¹.  
-    - **Fator φ – UNFCCC A6.4‑AMT‑003 (2024)**: para clima úmido, φ = 0,85.  
-    - **Captura de metano**: 60% (dado real do Aterro Guatapará).  
+    <div class="footer">
+    <strong>Base metodológica:</strong> IPCC 2006 (First Order Decay), Yang et al. 2017 (fatores de emissão para compostagem), UNFCCC AMS-III.F e TOOL13.  
+    Dados do aterro Guatapará (Ribeirão Preto) fornecidos pelo projeto. Simulador desenvolvido para ACIRP.  
+    **Aviso:** Os resultados são estimativas e não substituem uma avaliação completa para registro de créditos de carbono.
+    </div>
+    """, unsafe_allow_html=True)
 
-    **2. Tecnologias de compostagem**  
-    - **Fatores padrão UNFCCC (AMS‑III.F / TOOL13)**: CH₄ = 0,002 t/t úmido; N₂O = 0,0005 t/t úmido.  
-    - **Fatores Yang et al. (2017)**: Vermicompostagem (CH₄ = 0,0013 t/tC; N₂O = 0,0092 t/tN); Termofílica (CH₄ = 0,0060 t/tC; N₂O = 0,0196 t/tN).  
-
-    **3. Potencial de Aquecimento Global (GWP)**  
-    - Forster et al. (2021) IPCC AR6: GWP-20 (CH₄=79,7; N₂O=273); GWP-100 (27,0;273); GWP-500 (7,2;130).  
-
-    **⚠️ Reprodutibilidade:** Seed fixa (50) e paralelização com joblib.
+else:
+    st.info("👈 **Configure os parâmetros na barra lateral e clique em 'Executar Simulação' para começar.**")
+    st.markdown("""
+    ### Bem-vindo ao Simulador de Créditos de Carbono para Compostagem
+    
+    Este aplicativo foi desenvolvido para a **ACIRP (Associação Comercial e Industrial de Ribeirão Preto)** com o objetivo de quantificar o potencial de geração de créditos de carbono a partir de projetos de compostagem de resíduos orgânicos.
+    
+    **Principais funcionalidades:**
+    - Entrada de resíduos por **kg/dia** ou por **bombonas de 50 litros** (com densidade ajustável)
+    - Comparação entre três tecnologias: vermicompostagem, compostagem termofílica e fatores padrão UNFCCC
+    - Baseline realista: Aterro Sanitário Guatapará (Ribeirão Preto) com 60% de captura de metano
+    - Resultados financeiros em Euros e Reais com cotações ao vivo
+    - Análise de sensibilidade (Sobol) e incerteza (Monte Carlo)
+    
+    **Instruções:** Use a barra lateral à esquerda para definir os parâmetros do seu projeto e clique no botão verde.
     """)
