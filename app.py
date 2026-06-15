@@ -1,7 +1,7 @@
 # =============================================================================
 # SIMULADOR DE CRÉDITOS DE CARBONO PARA COMPOSTAGEM
 # APRESENTAÇÃO PARA A ACIRP - RIBEIRÃO PRETO
-# DESIGN PROFISSIONAL E MODERNO
+# DESIGN PROFISSIONAL, LIMPO E ALTO CONTRASTE
 # =============================================================================
 
 import requests
@@ -20,7 +20,7 @@ from SALib.analyze.sobol import analyze
 import yfinance as yf
 
 # =============================================================================
-# CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA CHAMADA STREAMLIT)
+# CONFIGURAÇÃO DA PÁGINA
 # =============================================================================
 st.set_page_config(
     page_title="ACIRP Carbono | Simulador de Compostagem",
@@ -30,71 +30,72 @@ st.set_page_config(
 )
 
 # =============================================================================
-# CSS PERSONALIZADO - DESIGN MODERNO E INSTITUCIONAL
+# CSS PERSONALIZADO - ALTO CONTRASTE E DESIGN MODERNO
 # =============================================================================
 st.markdown("""
 <style>
-    /* Importação de fonte moderna */
+    /* Fonte moderna */
     @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
     
     html, body, .stApp {
         font-family: 'Inter', sans-serif;
-        background-color: #f8fafc;
+        background-color: #f4f7fc;
     }
     
     /* Cabeçalho principal */
     .main-header {
-        background: linear-gradient(135deg, #0f4c3a 0%, #1b5e3f 100%);
+        background: linear-gradient(135deg, #1e4a3b 0%, #2c6e4f 100%);
         padding: 1.8rem 2rem;
-        border-radius: 24px;
+        border-radius: 20px;
         margin-bottom: 2rem;
-        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        box-shadow: 0 6px 14px rgba(0,0,0,0.08);
         color: white;
     }
     .main-header h1 {
         margin: 0;
-        font-size: 2.2rem;
+        font-size: 2rem;
         font-weight: 700;
         letter-spacing: -0.01em;
     }
     .main-header p {
         margin: 0.5rem 0 0;
-        opacity: 0.9;
+        opacity: 0.92;
         font-size: 1rem;
     }
     
     /* Cards e containers */
     .card {
-        background-color: white;
+        background-color: #ffffff;
         border-radius: 20px;
         padding: 1.2rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         margin-bottom: 1rem;
-        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         border: 1px solid #e2e8f0;
+        transition: 0.2s;
     }
     .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 20px -10px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.08);
     }
     
-    /* Métricas em destaque */
+    /* Métricas em cards */
     .metric-card {
         background: white;
         border-radius: 20px;
         padding: 1.2rem;
         text-align: center;
         box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        border-top: 5px solid;
-        transition: all 0.2s;
+        border-top: 4px solid;
+        border-left: 1px solid #e2e8f0;
+        border-right: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
     }
     .metric-green { border-top-color: #2e7d32; }
     .metric-orange { border-top-color: #f57c00; }
     .metric-blue { border-top-color: #1976d2; }
     
-    /* Botões */
+    /* Botão principal */
     .stButton > button {
-        background-color: #1b5e3f;
+        background-color: #2c6e4f;
         color: white;
         font-weight: 600;
         border-radius: 40px;
@@ -104,30 +105,31 @@ st.markdown("""
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .stButton > button:hover {
-        background-color: #0f4c3a;
+        background-color: #1e4a3b;
         transform: scale(1.02);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
     
     /* Sidebar refinada */
     [data-testid="stSidebar"] {
         background-color: #ffffff;
         border-right: 1px solid #e2e8f0;
-        padding: 1rem;
+        padding: 1.2rem;
     }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
-        color: #0f4c3a;
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h2, 
+    [data-testid="stSidebar"] h3 {
+        color: #1e4a3b;
     }
     
-    /* Sliders e inputs mais suaves */
+    /* Sliders com cor suave */
     .stSlider > div > div > div {
-        background-color: #c8e6d9;
+        background-color: #cfe9df;
     }
     
     /* Tabs estilizadas */
     .stTabs [data-baseweb="tab-list"] {
         gap: 0.5rem;
-        background-color: #f1f5f9;
+        background-color: #edf2f7;
         border-radius: 40px;
         padding: 0.3rem;
     }
@@ -135,18 +137,18 @@ st.markdown("""
         border-radius: 40px;
         padding: 0.5rem 1.2rem;
         font-weight: 500;
-        color: #334155;
+        color: #2d3a4b;
     }
     .stTabs [aria-selected="true"] {
         background-color: white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        color: #1b5e3f;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        color: #1e4a3b;
     }
     
-    /* Expander elegante */
+    /* Expander leve */
     .streamlit-expanderHeader {
         font-weight: 600;
-        color: #0f4c3a;
+        color: #1e4a3b;
         background-color: #f8fafc;
         border-radius: 16px;
     }
@@ -155,45 +157,63 @@ st.markdown("""
     .footer {
         text-align: center;
         font-size: 0.75rem;
-        color: #64748b;
+        color: #4a5568;
         margin-top: 3rem;
         padding-top: 1rem;
         border-top: 1px solid #e2e8f0;
     }
     
-    /* Ajustes de texto justificado */
+    /* Textos justificados */
     p, .stMarkdown {
         text-align: justify;
+        color: #1e293b;
     }
     
     /* Números grandes */
     .big-number {
         font-size: 2rem;
         font-weight: 800;
-        color: #1b5e3f;
-        line-height: 1;
+        color: #1e4a3b;
+        line-height: 1.2;
     }
     
-    /* Mensagens info/success personalizadas */
+    /* Mensagens info/success */
     .stAlert {
         border-radius: 16px;
         border-left-width: 6px;
+    }
+    
+    /* Garantir contraste em todos os textos */
+    label, .stMarkdown, .stInfo, .stSuccess, .stWarning, .stException, 
+    .stText, .stCaption, .stMetric label, .stMetric .metric-value, 
+    .stMetric .metric-delta, .css-10trblm, .css-1offfwp {
+        color: #1e293b !important;
+    }
+    
+    /* Inputs e selects */
+    input, select, textarea {
+        color: #1e293b !important;
+        background-color: white !important;
+    }
+    
+    /* Dataframe */
+    .dataframe {
+        color: #1e293b !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# PARÂMETROS TÉCNICOS (BASE CIENTÍFICA - MANTIDOS DO ORIGINAL)
+# PARÂMETROS TÉCNICOS (MANTIDOS DO ORIGINAL)
 # =============================================================================
-CAPTURE_FRACTION_BASELINE = 0.6      # Aterro Guatapará
+CAPTURE_FRACTION_BASELINE = 0.6
 MCF_BASELINE = 1.0
 OX_BASELINE = 0.1
 PHI_BASELINE = 0.85
 
-EF_CH4_STD = 0.002      # t CH₄ / t resíduo úmido (UNFCCC)
-EF_N2O_STD = 0.0005     # t N₂O / t resíduo úmido
+EF_CH4_STD = 0.002
+EF_N2O_STD = 0.0005
 
-# Yang et al. 2017
 TOC = 0.436
 TN = 0.0142
 F_CH4_VERMI = 0.0013
@@ -205,7 +225,7 @@ COMPOSTING_DAYS = 50
 GWP_CH4_20 = 79.7
 GWP_N2O_20 = 273
 
-# Perfis diários (mesmos do original)
+# Perfis diários (mesmos do original, omitidos por brevidade, mas mantidos na íntegra no código real)
 profile_ch4_vermi = np.array([
     0.02,0.02,0.02,0.03,0.03,0.04,0.04,0.05,0.05,0.06,
     0.07,0.08,0.09,0.10,0.09,0.08,0.07,0.06,0.05,0.04,
@@ -431,20 +451,18 @@ if 'taxa_cambio' not in st.session_state:
 # SIDEBAR - PARÂMETROS COM DESIGN LIMPO
 # =============================================================================
 with st.sidebar:
-    # Espaço para logo institucional (substituir pelo logo real)
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1.5rem;">
-        <div style="background-color: #0f4c3a; border-radius: 20px; padding: 0.8rem; color: white;">
+        <div style="background-color: #1e4a3b; border-radius: 20px; padding: 0.8rem; color: white;">
             <span style="font-size: 1.8rem;">🌿</span>
             <h3 style="margin: 0; color: white;">ACIRP</h3>
-            <p style="margin: 0; font-size: 0.7rem;">Carbono Zero</p>
+            <p style="margin: 0; font-size: 0.7rem; color: #e0f2f1;">Carbono Zero</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("## ⚙️ Parâmetros do Projeto")
     
-    # Tipo de entrada com design em cards
     input_type = st.radio(
         "📦 Como informar os resíduos?",
         ["Quilogramas por dia (kg/dia)", "Bombonas de 50 litros"],
@@ -535,7 +553,6 @@ with st.sidebar:
     
     st.divider()
     
-    # Bloco de mercado
     st.markdown("### 💰 Mercado de Carbono")
     col_a, col_b = st.columns(2)
     with col_a:
@@ -554,11 +571,10 @@ with st.sidebar:
     
     st.divider()
     
-    # Botão principal de execução
     executar = st.button("🚀 Executar Simulação", type="primary", use_container_width=True)
 
 # =============================================================================
-# CABEÇALHO PRINCIPAL DA APLICAÇÃO
+# CABEÇALHO PRINCIPAL
 # =============================================================================
 st.markdown("""
 <div class="main-header">
@@ -573,15 +589,12 @@ st.markdown("""
 # =============================================================================
 if executar:
     with st.spinner("🔄 Processando modelo de emissões e gerando resultados... Isso pode levar alguns segundos."):
-        # Instancia o calculador com os GWP selecionados
         calc = GHGEmissionCalculator()
         calc.GWP_CH4 = gwp_ch4
         calc.GWP_N2O = gwp_n2o
         
-        # Executa cálculo principal
         res = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, temperatura, doc, umidade, anos_simulacao)
         
-        # Séries temporais
         base_series = res['base_series']
         vermi_series = res['vermi_series']
         termo_series = res['thermo_series']
@@ -596,16 +609,13 @@ if executar:
         df_anual['Evitado_Termo'] = df_anual['Base'] - df_anual['Termo']
         df_anual['Evitado_Std'] = df_anual['Base'] - df_anual['Std']
         
-        # Acumulados
         base_acum = np.cumsum(base_series)
         vermi_acum = np.cumsum(vermi_series)
         termo_acum = np.cumsum(termo_series)
         std_acum = np.cumsum(std_series)
         
-        # Mensagem de sucesso
         st.success("✅ Simulação concluída! Explore os resultados detalhados nas abas abaixo.")
         
-        # ===== RESULTADOS EM ABAS ESTILIZADAS =====
         tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Visão Geral", "💰 Resultados Financeiros", "📈 Análise Temporal", "🎯 Sensibilidade & Incerteza", "📋 Dados Detalhados"])
         
         with tab1:
@@ -639,7 +649,6 @@ if executar:
             A vermicompostagem apresenta o maior potencial de redução de emissões, seguida pela compostagem termofílica. Os fatores padrão UNFCCC são mais conservadores. A diferença entre as tecnologias é estatisticamente significativa e consistente ao longo do tempo.
             """)
             
-            # Gráfico de barras anual comparativo
             fig, ax = plt.subplots(figsize=(12, 6))
             x = np.arange(len(df_anual['Year']))
             width = 0.25
@@ -715,7 +724,6 @@ if executar:
             - A área verde no gráfico representa exatamente as emissões evitadas.
             """)
             
-            # Gráfico de linhas anuais evitadas
             fig3, ax3 = plt.subplots(figsize=(12, 5))
             ax3.plot(df_anual['Year'], df_anual['Evitado_Vermi'], 'go-', label='Vermicompostagem')
             ax3.plot(df_anual['Year'], df_anual['Evitado_Termo'], 'yo-', label='Termofílica')
@@ -834,7 +842,6 @@ if executar:
                 "Câmbio EUR/BRL": st.session_state.taxa_cambio
             })
     
-    # Rodapé
     st.markdown("---")
     st.markdown("""
     <div class="footer">
@@ -845,9 +852,8 @@ if executar:
     """, unsafe_allow_html=True)
 
 else:
-    # Tela inicial amigável
     st.markdown("""
-    <div style="background: linear-gradient(120deg, #e0f2f1 0%, #ffffff 100%); border-radius: 24px; padding: 2rem; margin: 1rem 0; text-align: center;">
+    <div style="background-color: #eef2f5; border-radius: 24px; padding: 2rem; margin: 1rem 0; text-align: center;">
         <span style="font-size: 3rem;">🌿</span>
         <h2>Bem-vindo ao Simulador de Créditos de Carbono</h2>
         <p style="font-size: 1.1rem; max-width: 800px; margin: 1rem auto;">Ferramenta desenvolvida para a <strong>ACIRP</strong> quantificar o potencial de geração de créditos de carbono a partir de projetos de compostagem de resíduos orgânicos.</p>
