@@ -30,7 +30,7 @@ st.set_page_config(
 )
 
 # =============================================================================
-# CSS PERSONALIZADO - ALTO CONTRASTE E DESIGN MODERNO
+# CSS PERSONALIZADO - ALTO CONTRASTE E TEXTO BRANCO NO CABEÇALHO
 # =============================================================================
 st.markdown("""
 <style>
@@ -42,25 +42,26 @@ st.markdown("""
         background-color: #f4f7fc;
     }
     
-    /* Cabeçalho principal */
+    /* Cabeçalho principal - fundo escuro, texto BRANCO */
     .main-header {
         background: linear-gradient(135deg, #1e4a3b 0%, #2c6e4f 100%);
         padding: 1.8rem 2rem;
         border-radius: 20px;
         margin-bottom: 2rem;
         box-shadow: 0 6px 14px rgba(0,0,0,0.08);
-        color: white;
     }
     .main-header h1 {
         margin: 0;
         font-size: 2rem;
         font-weight: 700;
         letter-spacing: -0.01em;
+        color: #ffffff !important;
     }
     .main-header p {
         margin: 0.5rem 0 0;
-        opacity: 0.92;
         font-size: 1rem;
+        color: #ffffff !important;
+        opacity: 0.95;
     }
     
     /* Cards e containers */
@@ -163,10 +164,10 @@ st.markdown("""
         border-top: 1px solid #e2e8f0;
     }
     
-    /* Textos justificados */
-    p, .stMarkdown {
+    /* Textos justificados e escuros para boa leitura */
+    p, .stMarkdown, .stInfo, .stSuccess, .stWarning {
         text-align: justify;
-        color: #1e293b;
+        color: #1e293b !important;
     }
     
     /* Números grandes */
@@ -183,10 +184,8 @@ st.markdown("""
         border-left-width: 6px;
     }
     
-    /* Garantir contraste em todos os textos */
-    label, .stMarkdown, .stInfo, .stSuccess, .stWarning, .stException, 
-    .stText, .stCaption, .stMetric label, .stMetric .metric-value, 
-    .stMetric .metric-delta, .css-10trblm, .css-1offfwp {
+    /* Garantir contraste em labels e métricas */
+    label, .stMetric label, .stMetric .metric-value, .stMetric .metric-delta {
         color: #1e293b !important;
     }
     
@@ -198,6 +197,11 @@ st.markdown("""
     
     /* Dataframe */
     .dataframe {
+        color: #1e293b !important;
+    }
+    
+    /* Sidebar texts */
+    .css-1offfwp, .css-10trblm {
         color: #1e293b !important;
     }
 </style>
@@ -225,7 +229,7 @@ COMPOSTING_DAYS = 50
 GWP_CH4_20 = 79.7
 GWP_N2O_20 = 273
 
-# Perfis diários (mesmos do original, omitidos por brevidade, mas mantidos na íntegra no código real)
+# Perfis diários
 profile_ch4_vermi = np.array([
     0.02,0.02,0.02,0.03,0.03,0.04,0.04,0.05,0.05,0.06,
     0.07,0.08,0.09,0.10,0.09,0.08,0.07,0.06,0.05,0.04,
@@ -256,7 +260,7 @@ N2O_pre_mgN_per_kg_total = 20.26
 N2O_pre_kg_per_kg_total = N2O_pre_mgN_per_kg_total * (44/28) / 1_000_000
 
 # =============================================================================
-# CLASSE DE CÁLCULO (MESMA LÓGICA)
+# CLASSE DE CÁLCULO
 # =============================================================================
 class GHGEmissionCalculator:
     def __init__(self):
@@ -388,7 +392,7 @@ class GHGEmissionCalculator:
         return (base.sum() - vermi.sum()), (base.sum() - thermo.sum()), (base.sum() - std.sum())
 
 # =============================================================================
-# FUNÇÕES AUXILIARES (COTAÇÃO, FORMATAÇÃO)
+# FUNÇÕES AUXILIARES
 # =============================================================================
 def obter_cotacao_carbono():
     try:
@@ -448,7 +452,7 @@ if 'taxa_cambio' not in st.session_state:
     st.session_state.taxa_cambio = euro
 
 # =============================================================================
-# SIDEBAR - PARÂMETROS COM DESIGN LIMPO
+# SIDEBAR - PARÂMETROS
 # =============================================================================
 with st.sidebar:
     st.markdown("""
@@ -510,39 +514,23 @@ with st.sidebar:
         k_opcao = st.selectbox(
             "Taxa de decomposição (k, ano⁻¹)",
             ["0,06 (aterro lento - padrão)", "0,40 (aterro rápido)"],
-            index=0,
-            help="Velocidade de degradação da matéria orgânica no aterro."
+            index=0
         )
         k_ano = 0.40 if "0,40" in k_opcao else 0.06
         
-        temperatura = st.slider(
-            "Temperatura média local (°C)",
-            min_value=15, max_value=35, value=25, step=1,
-            help="Média anual da temperatura em Ribeirão Preto (≈22-25°C)."
-        )
-        doc = st.slider(
-            "Carbono orgânico degradável (DOC, fração)",
-            min_value=0.10, max_value=0.25, value=0.15, step=0.01
-        )
-        umidade_pct = st.slider(
-            "Umidade dos resíduos (%)",
-            min_value=50, max_value=95, value=85, step=5
-        )
+        temperatura = st.slider("Temperatura média local (°C)", 15, 35, 25, 1)
+        doc = st.slider("Carbono orgânico degradável (DOC, fração)", 0.10, 0.25, 0.15, 0.01)
+        umidade_pct = st.slider("Umidade dos resíduos (%)", 50, 95, 85, 5)
         umidade = umidade_pct / 100.0
     
     with st.expander("⏱️ Horizonte do Projeto"):
-        anos_simulacao = st.slider(
-            "Anos de simulação",
-            min_value=5, max_value=30, value=20, step=5,
-            help="Período de geração de créditos de carbono."
-        )
+        anos_simulacao = st.slider("Anos de simulação", 5, 30, 20, 5)
     
     with st.expander("🎯 Cenário de Precificação"):
         gwp_option = st.radio(
             "Potencial de Aquecimento Global (GWP)",
             ["Otimista (GWP-20)", "Realista (GWP-100)", "Pessimista (GWP-500)"],
-            index=1,
-            help="GWP-100 é o padrão internacional mais aceito para projetos de carbono."
+            index=1
         )
         if gwp_option == "Otimista (GWP-20)":
             gwp_ch4, gwp_n2o = 79.7, 273
@@ -574,7 +562,7 @@ with st.sidebar:
     executar = st.button("🚀 Executar Simulação", type="primary", use_container_width=True)
 
 # =============================================================================
-# CABEÇALHO PRINCIPAL
+# CABEÇALHO PRINCIPAL (TEXTO BRANCO GARANTIDO)
 # =============================================================================
 st.markdown("""
 <div class="main-header">
