@@ -1,7 +1,7 @@
 # =============================================================================
 # SIMULADOR DE CRÉDITOS DE CARBONO PARA COMPOSTAGEM
-# APRESENTAÇÃO PARA ACIRP - RIBEIRÃO PRETO
-# VERSÃO PROFISSIONAL COM ENTRADA POR BOMBONAS E DESIGN MODERNO
+# APRESENTAÇÃO PARA A ACIRP - RIBEIRÃO PRETO
+# DESIGN PROFISSIONAL E MODERNO
 # =============================================================================
 
 import requests
@@ -20,107 +20,171 @@ from SALib.analyze.sobol import analyze
 import yfinance as yf
 
 # =============================================================================
-# CONFIGURAÇÕES INICIAIS E CSS PERSONALIZADO
+# CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA CHAMADA STREAMLIT)
 # =============================================================================
 st.set_page_config(
-    page_title="ACIRP | Simulador de Carbono para Compostagem",
-    page_icon="🌱",
+    page_title="ACIRP Carbono | Simulador de Compostagem",
+    page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# CSS moderno e responsivo
+# =============================================================================
+# CSS PERSONALIZADO - DESIGN MODERNO E INSTITUCIONAL
+# =============================================================================
 st.markdown("""
 <style>
-    /* Fonte e cores institucionais */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    html, body, [class*="css"] {
+    /* Importação de fonte moderna */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
+    
+    html, body, .stApp {
         font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
     }
+    
+    /* Cabeçalho principal */
     .main-header {
-        background: linear-gradient(90deg, #004d40 0%, #00695c 100%);
-        padding: 1.5rem;
-        border-radius: 15px;
+        background: linear-gradient(135deg, #0f4c3a 0%, #1b5e3f 100%);
+        padding: 1.8rem 2rem;
+        border-radius: 24px;
         margin-bottom: 2rem;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
         color: white;
-        text-align: center;
     }
     .main-header h1 {
         margin: 0;
         font-size: 2.2rem;
         font-weight: 700;
+        letter-spacing: -0.01em;
     }
     .main-header p {
         margin: 0.5rem 0 0;
         opacity: 0.9;
+        font-size: 1rem;
     }
+    
+    /* Cards e containers */
     .card {
-        background-color: #f8f9fa;
-        border-radius: 12px;
+        background-color: white;
+        border-radius: 20px;
         padding: 1.2rem;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         margin-bottom: 1rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 1px solid #e2e8f0;
     }
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 20px -10px rgba(0,0,0,0.1);
+    }
+    
+    /* Métricas em destaque */
     .metric-card {
         background: white;
-        border-radius: 12px;
-        padding: 1rem;
+        border-radius: 20px;
+        padding: 1.2rem;
         text-align: center;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        border-top: 4px solid #00695c;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        border-top: 5px solid;
+        transition: all 0.2s;
     }
+    .metric-green { border-top-color: #2e7d32; }
+    .metric-orange { border-top-color: #f57c00; }
+    .metric-blue { border-top-color: #1976d2; }
+    
+    /* Botões */
+    .stButton > button {
+        background-color: #1b5e3f;
+        color: white;
+        font-weight: 600;
+        border-radius: 40px;
+        padding: 0.6rem 1.5rem;
+        transition: all 0.2s;
+        border: none;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .stButton > button:hover {
+        background-color: #0f4c3a;
+        transform: scale(1.02);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    /* Sidebar refinada */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+        padding: 1rem;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+        color: #0f4c3a;
+    }
+    
+    /* Sliders e inputs mais suaves */
+    .stSlider > div > div > div {
+        background-color: #c8e6d9;
+    }
+    
+    /* Tabs estilizadas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background-color: #f1f5f9;
+        border-radius: 40px;
+        padding: 0.3rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 40px;
+        padding: 0.5rem 1.2rem;
+        font-weight: 500;
+        color: #334155;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: white;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        color: #1b5e3f;
+    }
+    
+    /* Expander elegante */
+    .streamlit-expanderHeader {
+        font-weight: 600;
+        color: #0f4c3a;
+        background-color: #f8fafc;
+        border-radius: 16px;
+    }
+    
+    /* Rodapé */
     .footer {
         text-align: center;
         font-size: 0.75rem;
-        color: #6c757d;
+        color: #64748b;
         margin-top: 3rem;
         padding-top: 1rem;
-        border-top: 1px solid #dee2e6;
+        border-top: 1px solid #e2e8f0;
     }
-    .stButton>button {
-        background-color: #00695c;
-        color: white;
-        font-weight: 600;
-        border-radius: 30px;
-        padding: 0.5rem 2rem;
-        transition: all 0.3s;
-    }
-    .stButton>button:hover {
-        background-color: #004d40;
-        transform: scale(1.02);
-    }
-    /* Justificar textos */
-    p, .stMarkdown, .stInfo, .stSuccess {
+    
+    /* Ajustes de texto justificado */
+    p, .stMarkdown {
         text-align: justify;
     }
-    /* Estilo para abas */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 8px 20px;
-        font-weight: 500;
-    }
-    /* Formatação de números */
+    
+    /* Números grandes */
     .big-number {
         font-size: 2rem;
-        font-weight: 700;
-        color: #00695c;
+        font-weight: 800;
+        color: #1b5e3f;
+        line-height: 1;
+    }
+    
+    /* Mensagens info/success personalizadas */
+    .stAlert {
+        border-radius: 16px;
+        border-left-width: 6px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Semente fixa
-np.random.seed(42)
-
-# Suprimir warnings
-warnings.filterwarnings("ignore")
-
 # =============================================================================
-# PARÂMETROS TÉCNICOS (BASE CIENTÍFICA)
+# PARÂMETROS TÉCNICOS (BASE CIENTÍFICA - MANTIDOS DO ORIGINAL)
 # =============================================================================
-# Fatores de emissão e constantes (mantidos do original)
 CAPTURE_FRACTION_BASELINE = 0.6      # Aterro Guatapará
 MCF_BASELINE = 1.0
 OX_BASELINE = 0.1
@@ -172,7 +236,7 @@ N2O_pre_mgN_per_kg_total = 20.26
 N2O_pre_kg_per_kg_total = N2O_pre_mgN_per_kg_total * (44/28) / 1_000_000
 
 # =============================================================================
-# CLASSE DE CÁLCULO (mesma lógica, mas com GWP ajustável)
+# CLASSE DE CÁLCULO (MESMA LÓGICA)
 # =============================================================================
 class GHGEmissionCalculator:
     def __init__(self):
@@ -353,39 +417,62 @@ def br_format(x, pos):
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # =============================================================================
-# INTERFACE PRINCIPAL
+# INICIALIZAÇÃO DO ESTADO DA SESSÃO
 # =============================================================================
-# Cabeçalho personalizado
-st.markdown("""
-<div class="main-header">
-    <h1>🌱 Simulador de Créditos de Carbono</h1>
-    <p>Projetos de Compostagem de Resíduos Orgânicos | Base metodológica IPCC e UNFCCC</p>
-    <p style="font-size:0.9rem;">Apresentação para a ACIRP - Ribeirão Preto</p>
-</div>
-""", unsafe_allow_html=True)
+if 'preco_carbono' not in st.session_state:
+    p, m, _, _ = obter_cotacao_carbono()
+    st.session_state.preco_carbono = p
+    st.session_state.moeda = m
+if 'taxa_cambio' not in st.session_state:
+    euro, _ = obter_cotacao_euro_real()
+    st.session_state.taxa_cambio = euro
 
-# Sidebar com parâmetros
+# =============================================================================
+# SIDEBAR - PARÂMETROS COM DESIGN LIMPO
+# =============================================================================
 with st.sidebar:
-    st.image("https://via.placeholder.com/200x80?text=ACIRP+Logo", use_column_width=True)  # Placeholder, substituir se tiver logo real
-    st.markdown("## ⚙️ Parâmetros de Entrada")
+    # Espaço para logo institucional (substituir pelo logo real)
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="background-color: #0f4c3a; border-radius: 20px; padding: 0.8rem; color: white;">
+            <span style="font-size: 1.8rem;">🌿</span>
+            <h3 style="margin: 0; color: white;">ACIRP</h3>
+            <p style="margin: 0; font-size: 0.7rem;">Carbono Zero</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Tipo de entrada: kg ou bombonas
-    input_type = st.radio("Como deseja informar os resíduos?", 
-                          ["Quilogramas por dia (kg/dia)", "Bombonas de 50 litros"], 
-                          index=1,  # padrão bombonas para demonstração
-                          help="Escolha a unidade mais prática para o seu projeto.")
+    st.markdown("## ⚙️ Parâmetros do Projeto")
+    
+    # Tipo de entrada com design em cards
+    input_type = st.radio(
+        "📦 Como informar os resíduos?",
+        ["Quilogramas por dia (kg/dia)", "Bombonas de 50 litros"],
+        index=1,
+        help="Escolha a unidade mais prática para o seu projeto."
+    )
     
     if input_type == "Quilogramas por dia (kg/dia)":
-        residuos_kg_dia = st.slider("Resíduos orgânicos (kg/dia)", 10, 5000, 500, 50,
-                                    help="Quantidade total de resíduos destinados à compostagem por dia.")
-        st.caption(f"→ Total anual: {residuos_kg_dia * 365 / 1000:.1f} toneladas")
+        residuos_kg_dia = st.slider(
+            "Resíduos orgânicos (kg/dia)",
+            min_value=10, max_value=5000, value=500, step=50,
+            help="Quantidade total de resíduos destinados à compostagem por dia."
+        )
+        st.caption(f"📊 Total anual: **{residuos_kg_dia * 365 / 1000:.1f} toneladas**")
     else:
         col1, col2 = st.columns(2)
         with col1:
-            num_bombonas = st.number_input("Bombonas de 50L por dia", min_value=1, max_value=100, value=10, step=1)
+            num_bombonas = st.number_input(
+                "Bombonas de 50L / dia",
+                min_value=1, max_value=100, value=10, step=1,
+                help="Número de bombonas de 50 litros coletadas por dia."
+            )
         with col2:
-            # Opção de densidade pré-definida ou manual
-            densidade_opcao = st.selectbox("Densidade do resíduo", ["Média (0,60 kg/L)", "Úmido (0,70 kg/L)", "Seco (0,50 kg/L)", "Personalizada"])
+            densidade_opcao = st.selectbox(
+                "Densidade do resíduo",
+                ["Média (0,60 kg/L)", "Úmido (0,70 kg/L)", "Seco (0,50 kg/L)", "Personalizada"],
+                index=0
+            )
             if densidade_opcao == "Média (0,60 kg/L)":
                 densidade = 0.60
             elif densidade_opcao == "Úmido (0,70 kg/L)":
@@ -397,57 +484,59 @@ with st.sidebar:
         
         residuos_kg_dia = num_bombonas * 50 * densidade
         st.info(f"📦 **Estimativa**: {num_bombonas} bombonas × 50L × {densidade:.2f} kg/L = **{residuos_kg_dia:.1f} kg/dia**")
-        st.caption(f"→ Total anual: {residuos_kg_dia * 365 / 1000:.1f} toneladas")
+        st.caption(f"📊 Total anual: **{residuos_kg_dia * 365 / 1000:.1f} toneladas**")
     
     st.divider()
-    st.markdown("### 🌡️ Parâmetros Ambientais")
-    k_opcao = st.selectbox("Taxa de decomposição (k, ano⁻¹)", ["0,06 (aterro lento - padrão)", "0,40 (aterro rápido)"], index=0)
-    k_ano = 0.40 if "0,40" in k_opcao else 0.06
     
-    temperatura = st.slider("Temperatura média local (°C)", 15, 35, 25, 1,
-                            help="Média anual da temperatura em Ribeirão Preto (~22-25°C)")
-    doc = st.slider("Carbono orgânico degradável (DOC, fração)", 0.10, 0.25, 0.15, 0.01)
-    umidade_pct = st.slider("Umidade dos resíduos (%)", 50, 95, 85, 5)
-    umidade = umidade_pct / 100.0
+    with st.expander("🌡️ Parâmetros Ambientais", expanded=True):
+        k_opcao = st.selectbox(
+            "Taxa de decomposição (k, ano⁻¹)",
+            ["0,06 (aterro lento - padrão)", "0,40 (aterro rápido)"],
+            index=0,
+            help="Velocidade de degradação da matéria orgânica no aterro."
+        )
+        k_ano = 0.40 if "0,40" in k_opcao else 0.06
+        
+        temperatura = st.slider(
+            "Temperatura média local (°C)",
+            min_value=15, max_value=35, value=25, step=1,
+            help="Média anual da temperatura em Ribeirão Preto (≈22-25°C)."
+        )
+        doc = st.slider(
+            "Carbono orgânico degradável (DOC, fração)",
+            min_value=0.10, max_value=0.25, value=0.15, step=0.01
+        )
+        umidade_pct = st.slider(
+            "Umidade dos resíduos (%)",
+            min_value=50, max_value=95, value=85, step=5
+        )
+        umidade = umidade_pct / 100.0
+    
+    with st.expander("⏱️ Horizonte do Projeto"):
+        anos_simulacao = st.slider(
+            "Anos de simulação",
+            min_value=5, max_value=30, value=20, step=5,
+            help="Período de geração de créditos de carbono."
+        )
+    
+    with st.expander("🎯 Cenário de Precificação"):
+        gwp_option = st.radio(
+            "Potencial de Aquecimento Global (GWP)",
+            ["Otimista (GWP-20)", "Realista (GWP-100)", "Pessimista (GWP-500)"],
+            index=1,
+            help="GWP-100 é o padrão internacional mais aceito para projetos de carbono."
+        )
+        if gwp_option == "Otimista (GWP-20)":
+            gwp_ch4, gwp_n2o = 79.7, 273
+        elif gwp_option == "Realista (GWP-100)":
+            gwp_ch4, gwp_n2o = 27.0, 273
+        else:
+            gwp_ch4, gwp_n2o = 7.2, 130
     
     st.divider()
-    st.markdown("### ⏱️ Horizonte de Projeto")
-    anos_simulacao = st.slider("Anos de simulação", 5, 30, 20, 5)
     
-    st.divider()
-    st.markdown("### 🎯 Cenário de Precificação")
-    gwp_option = st.radio(
-        "Potencial de Aquecimento Global (GWP)",
-        ["Otimista (GWP-20)", "Realista (GWP-100)", "Pessimista (GWP-500)"],
-        index=1,
-        help="GWP-100 é o padrão mais aceito internacionalmente para projetos de carbono."
-    )
-    
-    # Mapeamento GWP
-    if gwp_option == "Otimista (GWP-20)":
-        gwp_ch4, gwp_n2o = 79.7, 273
-    elif gwp_option == "Realista (GWP-100)":
-        gwp_ch4, gwp_n2o = 27.0, 273
-    else:
-        gwp_ch4, gwp_n2o = 7.2, 130
-    
-    st.divider()
-    # Botão de execução
-    executar = st.button("🚀 Executar Simulação", type="primary", use_container_width=True)
-
-# Inicializar estado da sessão para cotações
-if 'preco_carbono' not in st.session_state:
-    p, m, _, _ = obter_cotacao_carbono()
-    st.session_state.preco_carbono = p
-    st.session_state.moeda = m
-if 'taxa_cambio' not in st.session_state:
-    euro, _ = obter_cotacao_euro_real()
-    st.session_state.taxa_cambio = euro
-
-# Atualização manual de cotações na sidebar
-with st.sidebar:
-    st.divider()
-    st.markdown("### 💰 Mercado")
+    # Bloco de mercado
+    st.markdown("### 💰 Mercado de Carbono")
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button("🔄 Atualizar Cotações", use_container_width=True):
@@ -462,6 +551,22 @@ with st.sidebar:
     st.metric("Euro (EUR/BRL)", f"R$ {st.session_state.taxa_cambio:.2f}")
     preco_real = st.session_state.preco_carbono * st.session_state.taxa_cambio
     st.metric("Carbono em R$", f"R$ {preco_real:.2f}")
+    
+    st.divider()
+    
+    # Botão principal de execução
+    executar = st.button("🚀 Executar Simulação", type="primary", use_container_width=True)
+
+# =============================================================================
+# CABEÇALHO PRINCIPAL DA APLICAÇÃO
+# =============================================================================
+st.markdown("""
+<div class="main-header">
+    <h1>🌱 Simulador de Créditos de Carbono</h1>
+    <p>Projetos de Compostagem de Resíduos Orgânicos | Base metodológica IPCC e UNFCCC</p>
+    <p style="font-size:0.9rem;">Apresentação para a <strong>ACIRP - Ribeirão Preto</strong></p>
+</div>
+""", unsafe_allow_html=True)
 
 # =============================================================================
 # EXECUÇÃO DA SIMULAÇÃO
@@ -497,26 +602,27 @@ if executar:
         termo_acum = np.cumsum(termo_series)
         std_acum = np.cumsum(std_series)
         
-        # ===== RESULTADOS EM ABAS =====
-        st.success("✅ Simulação concluída! Explore os resultados nas abas abaixo.")
+        # Mensagem de sucesso
+        st.success("✅ Simulação concluída! Explore os resultados detalhados nas abas abaixo.")
         
-        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Visão Geral", "💰 Resultados Financeiros", "📈 Análise Temporal", "🎯 Sensibilidade e Incerteza", "📋 Dados Detalhados"])
+        # ===== RESULTADOS EM ABAS ESTILIZADAS =====
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Visão Geral", "💰 Resultados Financeiros", "📈 Análise Temporal", "🎯 Sensibilidade & Incerteza", "📋 Dados Detalhados"])
         
         with tab1:
             st.markdown("## Resumo Executivo")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.markdown("<div class='metric-card metric-green'>", unsafe_allow_html=True)
                 st.metric("Emissões evitadas (Vermicompostagem)", f"{formatar_br(res['vermi_avoided'])} tCO₂e")
                 st.caption("Base: Yang et al. 2017")
                 st.markdown("</div>", unsafe_allow_html=True)
             with col2:
-                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.markdown("<div class='metric-card metric-orange'>", unsafe_allow_html=True)
                 st.metric("Emissões evitadas (Termofílica)", f"{formatar_br(res['thermo_avoided'])} tCO₂e")
                 st.caption("Base: Yang et al. 2017")
                 st.markdown("</div>", unsafe_allow_html=True)
             with col3:
-                st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+                st.markdown("<div class='metric-card metric-blue'>", unsafe_allow_html=True)
                 st.metric("Emissões evitadas (Padrão UNFCCC)", f"{formatar_br(res['std_avoided'])} tCO₂e")
                 st.caption("Base: AMS‑III.F / TOOL13")
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -538,7 +644,7 @@ if executar:
             x = np.arange(len(df_anual['Year']))
             width = 0.25
             ax.bar(x - width, df_anual['Evitado_Vermi'], width, label='Vermicompostagem (Yang)', color='#2e7d32', edgecolor='black')
-            ax.bar(x, df_anual['Evitado_Termo'], width, label='Termofílica (Yang)', color='#ff9800', hatch='//', edgecolor='black')
+            ax.bar(x, df_anual['Evitado_Termo'], width, label='Termofílica (Yang)', color='#f57c00', hatch='//', edgecolor='black')
             ax.bar(x + width, df_anual['Evitado_Std'], width, label='Padrão UNFCCC', color='#1976d2', hatch='\\\\', edgecolor='black')
             ax.set_xticks(x)
             ax.set_xticklabels(df_anual['Year'])
@@ -548,7 +654,7 @@ if executar:
             ax.yaxis.set_major_formatter(FuncFormatter(br_format))
             st.pyplot(fig)
             plt.close(fig)
-            
+        
         with tab2:
             st.markdown("## Avaliação Financeira")
             preco_euro = st.session_state.preco_carbono
@@ -557,21 +663,27 @@ if executar:
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.markdown("#### Vermicompostagem")
+                st.markdown("<div class='metric-card metric-green'>", unsafe_allow_html=True)
+                st.markdown("#### 🪱 Vermicompostagem")
                 st.metric("Créditos totais", f"{formatar_br(res['vermi_avoided'])} tCO₂e")
                 st.metric("Receita em Euros", f"€ {formatar_br(res['vermi_avoided'] * preco_euro)}")
                 st.metric("Receita em Reais", f"R$ {formatar_br(res['vermi_avoided'] * preco_real)}")
                 st.caption(f"Preço do carbono: €{preco_euro:.2f} | Euro: R${cambio:.2f}")
+                st.markdown("</div>", unsafe_allow_html=True)
             with col2:
-                st.markdown("#### Termofílica")
+                st.markdown("<div class='metric-card metric-orange'>", unsafe_allow_html=True)
+                st.markdown("#### 🔥 Termofílica")
                 st.metric("Créditos totais", f"{formatar_br(res['thermo_avoided'])} tCO₂e")
                 st.metric("Receita em Euros", f"€ {formatar_br(res['thermo_avoided'] * preco_euro)}")
                 st.metric("Receita em Reais", f"R$ {formatar_br(res['thermo_avoided'] * preco_real)}")
+                st.markdown("</div>", unsafe_allow_html=True)
             with col3:
-                st.markdown("#### Padrão UNFCCC")
+                st.markdown("<div class='metric-card metric-blue'>", unsafe_allow_html=True)
+                st.markdown("#### 📊 Padrão UNFCCC")
                 st.metric("Créditos totais", f"{formatar_br(res['std_avoided'])} tCO₂e")
                 st.metric("Receita em Euros", f"€ {formatar_br(res['std_avoided'] * preco_euro)}")
                 st.metric("Receita em Reais", f"R$ {formatar_br(res['std_avoided'] * preco_real)}")
+                st.markdown("</div>", unsafe_allow_html=True)
             
             st.markdown("---")
             st.success(f"""
@@ -580,7 +692,7 @@ if executar:
             - Receita anual média (vermicompostagem): **R$ {formatar_br(res['vermi_avoided'] * preco_real / anos_simulacao)}/ano**.  
             - Por tonelada de resíduo processado: **R$ {formatar_br(res['vermi_avoided'] * preco_real / (residuos_kg_dia * 365 / 1000))}**.
             """)
-            
+        
         with tab3:
             st.markdown("## Emissões acumuladas e séries temporais")
             fig2, ax2 = plt.subplots(figsize=(12, 6))
@@ -615,15 +727,14 @@ if executar:
             ax3.yaxis.set_major_formatter(FuncFormatter(br_format))
             st.pyplot(fig3)
             plt.close(fig3)
-            
+        
         with tab4:
             st.markdown("## Análise de Sensibilidade (Sobol) e Incerteza (Monte Carlo)")
             st.warning("⚠️ As simulações abaixo podem levar até 30 segundos. Aguarde.")
             
             with st.spinner("Executando análise de sensibilidade (Sobol)..."):
-                # Configuração do problema Sobol
                 problem = {'num_vars': 3, 'names': ['k', 'T', 'DOC'], 'bounds': [[0.06, 0.40], [20, 40], [0.10, 0.25]]}
-                n_samples_sobol = 128  # amostras para Sobol
+                n_samples_sobol = 128
                 param_values = sample(problem, n_samples_sobol, seed=42)
                 
                 def f_sobol(p):
@@ -688,7 +799,6 @@ if executar:
                 })
                 st.dataframe(stats_df.style.format({col: lambda x: formatar_br(x) for col in stats_df.columns if col != 'Tecnologia'}))
                 
-                # Teste t pareado
                 t_vt = stats.ttest_rel(arr_v_mc, arr_t_mc)[1]
                 t_vs = stats.ttest_rel(arr_v_mc, arr_s_mc)[1]
                 t_ts = stats.ttest_rel(arr_t_mc, arr_s_mc)[1]
@@ -730,23 +840,46 @@ if executar:
     <div class="footer">
     <strong>Base metodológica:</strong> IPCC 2006 (First Order Decay), Yang et al. 2017 (fatores de emissão para compostagem), UNFCCC AMS-III.F e TOOL13.  
     Dados do aterro Guatapará (Ribeirão Preto) fornecidos pelo projeto. Simulador desenvolvido para ACIRP.  
-    **Aviso:** Os resultados são estimativas e não substituem uma avaliação completa para registro de créditos de carbono.
+    <strong>Aviso:</strong> Os resultados são estimativas e não substituem uma avaliação completa para registro de créditos de carbono.
     </div>
     """, unsafe_allow_html=True)
 
 else:
-    st.info("👈 **Configure os parâmetros na barra lateral e clique em 'Executar Simulação' para começar.**")
+    # Tela inicial amigável
     st.markdown("""
-    ### Bem-vindo ao Simulador de Créditos de Carbono para Compostagem
+    <div style="background: linear-gradient(120deg, #e0f2f1 0%, #ffffff 100%); border-radius: 24px; padding: 2rem; margin: 1rem 0; text-align: center;">
+        <span style="font-size: 3rem;">🌿</span>
+        <h2>Bem-vindo ao Simulador de Créditos de Carbono</h2>
+        <p style="font-size: 1.1rem; max-width: 800px; margin: 1rem auto;">Ferramenta desenvolvida para a <strong>ACIRP</strong> quantificar o potencial de geração de créditos de carbono a partir de projetos de compostagem de resíduos orgânicos.</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    Este aplicativo foi desenvolvido para a **ACIRP (Associação Comercial e Industrial de Ribeirão Preto)** com o objetivo de quantificar o potencial de geração de créditos de carbono a partir de projetos de compostagem de resíduos orgânicos.
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        <div class="card">
+        <h3>📦 Entrada por bombonas</h3>
+        <p>Informe quantas bombonas de 50 litros de resíduos orgânicos são coletadas por dia. Ajuste a densidade conforme o tipo de resíduo (mais úmido ou seco).</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="card">
+        <h3>💰 Resultados financeiros</h3>
+        <p>Obtenha a receita potencial com a venda de créditos de carbono em Euros e Reais, com cotações atualizadas do mercado europeu.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown("""
+        <div class="card">
+        <h3>📊 Comparação de tecnologias</h3>
+        <p>Compare vermicompostagem, compostagem termofílica e os fatores padrão da UNFCCC, utilizando um baseline realista do Aterro Guatapará.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="card">
+        <h3>🎯 Análises avançadas</h3>
+        <p>Inclui análise de sensibilidade (Sobol) e simulação de Monte Carlo para avaliar a incerteza dos resultados.</p>
+        </div>
+        """, unsafe_allow_html=True)
     
-    **Principais funcionalidades:**
-    - Entrada de resíduos por **kg/dia** ou por **bombonas de 50 litros** (com densidade ajustável)
-    - Comparação entre três tecnologias: vermicompostagem, compostagem termofílica e fatores padrão UNFCCC
-    - Baseline realista: Aterro Sanitário Guatapará (Ribeirão Preto) com 60% de captura de metano
-    - Resultados financeiros em Euros e Reais com cotações ao vivo
-    - Análise de sensibilidade (Sobol) e incerteza (Monte Carlo)
-    
-    **Instruções:** Use a barra lateral à esquerda para definir os parâmetros do seu projeto e clique no botão verde.
-    """)
+    st.info("👈 **Configure os parâmetros na barra lateral e clique em 'Executar Simulação' para começar.**")
