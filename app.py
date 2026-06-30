@@ -72,8 +72,8 @@ OX_BASELINE = 0.1
 PHI_BASELINE = 0.85                  # Fator φ para clima úmido (UNFCCC 2024)
 
 # Fatores de emissão padrão da metodologia UNFCCC (AMS‑III.F / TOOL13)
-EF_CH4_STD = 0.002      # t CH₄ / t resíduo úmido
-EF_N2O_STD = 0.0005     # t N₂O / t resíduo úmido
+EF_CH4_STD = 0.002      # t CH₄ / t resíduo úmido  → 0.002 kg CH₄ / kg resíduo
+EF_N2O_STD = 0.0002     # t N₂O / t resíduo úmido  → 0.0002 kg N₂O / kg resíduo (CORRIGIDO)
 
 # Parâmetros fixos baseados na literatura (Yang et al. 2017)
 TOC = 0.436
@@ -119,7 +119,7 @@ N2O_pre_mgN_per_kg_total = 20.26
 N2O_pre_kg_per_kg_total = N2O_pre_mgN_per_kg_total * (44/28) / 1_000_000
 
 # =============================================================================
-# CLASSE DE CÁLCULO (idêntica ao original)
+# CLASSE DE CÁLCULO (CORRIGIDA – SEM DIVISÃO POR 1000 NO TOOL13)
 # =============================================================================
 class GHGEmissionCalculator:
     def __init__(self):
@@ -203,12 +203,12 @@ class GHGEmissionCalculator:
         return ch4, n2o
 
     def calculate_standard_emissions(self, w, umid, years=20):
-        """Emissões calculadas com os fatores padrão UNFCCC (AMS‑III.F / TOOL13)."""
+        """Emissões calculadas com os fatores padrão UNFCCC (AMS‑III.F / TOOL13).
+           CORREÇÃO: fatores já estão em kg gás / kg resíduo – sem divisão por 1000."""
         days = years*365
-        ch4_per_kg = self.EF_CH4_std / 1000.0
-        n2o_per_kg = self.EF_N2O_std / 1000.0
-        ch4_batch = w * ch4_per_kg
-        n2o_batch = w * n2o_per_kg
+        # Fatores aplicados diretamente (sem divisão extra)
+        ch4_batch = w * self.EF_CH4_std       # w [kg/dia] × 0.002 [kg CH₄/kg] → kg CH₄/dia
+        n2o_batch = w * self.EF_N2O_std       # w [kg/dia] × 0.0002 [kg N₂O/kg] → kg N₂O/dia
         ch4 = np.zeros(days)
         n2o = np.zeros(days)
         for e in range(days):
@@ -367,7 +367,7 @@ st.caption("Comparação: Vermicompostagem (Yang et al. 2017) vs Compostagem Ter
 
 with st.container():
     st.markdown("""
-    **📘 Nota metodológica:** A metodologia **AMS‑III.F** e sua ferramenta **TOOL13** (UNFCCC, 2016) fornecem fatores de emissão padrão para qualquer projeto de compostagem: **CH₄ = 0,002 t/t resíduo úmido** e **N₂O = 0,0005 t/t resíduo úmido**. Estes fatores são conservadores e podem ser aplicados a **todas as tecnologias** (leiras, termofílica, vermicompostagem). Neste simulador, para fins de comparação científica, utilizamos: **Fatores padrão UNFCCC** → aplicados a um cenário de compostagem em leiras aeradas; **Fatores experimentais de Yang et al. (2017)** → para vermicompostagem e compostagem termofílica. Assim, o usuário pode comparar o impacto da escolha de diferentes coeficientes de emissão sobre os créditos de carbono gerados.
+    **📘 Nota metodológica:** A metodologia **AMS‑III.F** e sua ferramenta **TOOL13** (UNFCCC, 2017) fornecem fatores de emissão padrão para projetos de compostagem: **CH₄ = 0,002 t/t resíduo úmido** e **N₂O = 0,0002 t/t resíduo úmido**. Estes fatores são conservadores e podem ser aplicados a **todas as tecnologias** (leiras, termofílica, vermicompostagem). Neste simulador, para fins de comparação científica, utilizamos: **Fatores padrão UNFCCC** → aplicados a um cenário de compostagem em leiras aeradas; **Fatores experimentais de Yang et al. (2017)** → para vermicompostagem e compostagem termofílica. Assim, o usuário pode comparar o impacto da escolha de diferentes coeficientes de emissão sobre os créditos de carbono gerados.
     """)
     st.divider()
 
@@ -722,7 +722,7 @@ with st.expander("📚 Referências Metodológicas Detalhadas"):
     - **Captura de metano**: 60% (dado real do Aterro Guatapará).  
 
     **2. Tecnologias de compostagem**  
-    - **Fatores padrão UNFCCC (AMS‑III.F / TOOL13)**: CH₄ = 0,002 t/t úmido; N₂O = 0,0005 t/t úmido.  
+    - **Fatores padrão UNFCCC (AMS‑III.F / TOOL13)**: CH₄ = 0,002 t/t úmido; N₂O = 0,0002 t/t úmido.  
     - **Fatores Yang et al. (2017)**: Vermicompostagem (CH₄ = 0,0013 t/tC; N₂O = 0,0092 t/tN); Termofílica (CH₄ = 0,0060 t/tC; N₂O = 0,0196 t/tN).  
 
     **3. Potencial de Aquecimento Global (GWP)**  
