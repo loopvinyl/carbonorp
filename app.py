@@ -119,7 +119,7 @@ N2O_pre_mgN_per_kg_total = 20.26
 N2O_pre_kg_per_kg_total = N2O_pre_mgN_per_kg_total * (44/28) / 1_000_000
 
 # =============================================================================
-# CLASSE DE CÁLCULO (CORRIGIDA – SEM DIVISÃO POR 1000 NO TOOL13)
+# CLASSE DE CÁLCULO (CORRIGIDA – DOCf fixo baseado na Tabela 7 UNFCCC)
 # =============================================================================
 class GHGEmissionCalculator:
     def __init__(self):
@@ -147,15 +147,25 @@ class GHGEmissionCalculator:
         self.CH4_pre_kg_per_kg_day = CH4_pre_kg_per_kg_day
         self.N2O_pre_kg_per_kg_total = N2O_pre_kg_per_kg_total
 
-    def calculate_landfill_emissions(self, w, k, T, doc, umid, years=20, phi=PHI_BASELINE, capt=CAPTURE_FRACTION_BASELINE):
+    # -------------------------------------------------------------------------
+    # MÉTODO MODIFICADO: agora recebe 'docf' como parâmetro (Tabela 7 UNFCCC)
+    # -------------------------------------------------------------------------
+    def calculate_landfill_emissions(self, w, k, T, doc, docf, umid, years=20, phi=PHI_BASELINE, capt=CAPTURE_FRACTION_BASELINE):
+        """
+        w: kg de resíduo por dia
+        doc: fração de carbono orgânico degradável (total)
+        docf: fração do DOC que realmente se decompõe (fixo em 0.7 para este projeto)
+        T: temperatura média (°C) – não usado para docf, mantido para consistência
+        """
         days = years*365
-        docf = 0.0147*T + 0.28
-        ch4_pot = (doc*docf*self.MCF*self.F*(16/12)*(1-self.Ri)*(1-self.OX)) * w
+        # DOCf agora é passado como argumento (fixo, não calculado linearmente)
+        ch4_pot = (doc * docf * self.MCF * self.F * (16/12) * (1 - self.Ri) * (1 - self.OX)) * w
         t = np.arange(1, days+1)
         kernel = np.exp(-k*(t-1)/365) - np.exp(-k*t/365)
         ch4 = np.convolve(np.ones(days), kernel, mode='full')[:days] * ch4_pot
         ch4 = ch4 * phi * (1-capt)
 
+        # N2O do aterro (Wang et al.)
         opening_factor = min(1.0, (100/w)*(8/24))
         E_avg = opening_factor*1.91 + (1-opening_factor)*2.15
         moisture_factor = (1-umid)/(1-0.55)
@@ -163,6 +173,7 @@ class GHGEmissionCalculator:
         kernel_n2o = np.array([self.profile_n2o_landfill.get(d,0) for d in range(1,6)])
         n2o = np.convolve(np.full(days, daily_n2o), kernel_n2o, mode='full')[:days]
 
+        # Pré-descarte (Feng et al.)
         ch4_pre = np.full(days, w * self.CH4_pre_kg_per_kg_day)
         n2o_pre = np.zeros(days)
         for e in range(days):
@@ -219,8 +230,8 @@ class GHGEmissionCalculator:
                     n2o[ed] += n2o_batch * self.profile_n2o_vermi[d]
         return ch4, n2o
 
-    def calculate_avoided_emissions(self, w, k, T, doc, umid, years):
-        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, umid, years)
+    def calculate_avoided_emissions(self, w, k, T, doc, docf, umid, years):
+        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, docf, umid, years)
         ch4_v, n2o_v = self.calculate_vermicomposting_emissions(w, umid, years)
         ch4_t, n2o_t = self.calculate_thermophilic_emissions(w, umid, years)
         ch4_s, n2o_s = self.calculate_standard_emissions(w, umid, years)
@@ -238,8 +249,8 @@ class GHGEmissionCalculator:
             'base_series': base, 'vermi_series': vermi, 'thermo_series': thermo, 'std_series': std
         }
 
-    def calculate_avoided_emissions_fast(self, w, k, T, doc, umid, years):
-        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, umid, years)
+    def calculate_avoided_emissions_fast(self, w, k, T, doc, docf, umid, years):
+        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, docf, umid, years)
         ch4_v, n2o_v = self.calculate_vermicomposting_emissions(w, umid, years)
         ch4_t, n2o_t = self.calculate_thermophilic_emissions(w, umid, years)
         ch4_s, n2o_s = self.calculate_standard_emissions(w, umid, years)
@@ -368,13 +379,15 @@ st.caption("Comparação: Vermicompostagem (Yang et al. 2017) vs Compostagem Ter
 with st.container():
     st.markdown("""
     **📘 Nota metodológica:** A metodologia **AMS‑III.F** e sua ferramenta **TOOL13** (UNFCCC, 2017) fornecem fatores de emissão padrão para projetos de compostagem: **CH₄ = 0,002 t/t resíduo úmido** e **N₂O = 0,0002 t/t resíduo úmido**. Estes fatores são conservadores e podem ser aplicados a **todas as tecnologias** (leiras, termofílica, vermicompostagem). Neste simulador, para fins de comparação científica, utilizamos: **Fatores padrão UNFCCC** → aplicados a um cenário de compostagem em leiras aeradas; **Fatores experimentais de Yang et al. (2017)** → para vermicompostagem e compostagem termofílica. Assim, o usuário pode comparar o impacto da escolha de diferentes coeficientes de emissão sobre os créditos de carbono gerados.
+
+    **✅ Atualização:** O cálculo do **baseline (aterro)** agora utiliza o **DOC_f = 0,7** (fixo para resíduos altamente decomponíveis – alimentos e grama/podas), conforme **Tabela 7** da UNFCCC A6.4‑AMT‑003 (2025), substituindo a antiga fórmula empírica `0.0147*T + 0.28`. Os cenários de vermicompostagem e termofílica (Yang et al.) permanecem inalterados.
     """)
     st.divider()
 
 exibir_cotacao_carbono()
 
 # =============================================================================
-# SIDEBAR COM PARÂMETROS (INCLUINDO OPÇÃO DE BOMBONAS)
+# SIDEBAR COM PARÂMETROS (INCLUINDO OPÇÃO DE BOMBONAS E DOC_f FIXO)
 # =============================================================================
 with st.sidebar:
     st.header("⚙️ Parâmetros")
@@ -399,6 +412,14 @@ with st.sidebar:
     st.session_state.k_ano = k_ano
     T = st.slider("Temperatura média (°C)", 20, 40, 25, 1)
     DOC = st.slider("DOC (fração)", 0.10, 0.25, 0.15, 0.01)
+    
+    # =====================================================================
+    # DOC_f FIXO PARA O PROJETO (Ribeirão Preto – alimentos + grama/podas)
+    # Conforme Tabela 7 da UNFCCC A6.4-AMT-003: altamente decomponível = 0.7
+    # =====================================================================
+    DOC_f = 0.7
+    st.info("📌 **DOC_f fixo em 0,7** – Resíduos altamente decomponíveis (restaurantes + grama/podas), conforme Tabela 7 da UNFCCC A6.4-AMT-003.")
+    
     umidade_valor = st.slider("Umidade (%)", 50, 95, 85, 1)
     umidade = umidade_valor/100.0
     anos_simulacao = st.slider("Anos de simulação", 5, 50, 20, 5)
@@ -425,17 +446,17 @@ with st.sidebar:
         st.session_state.run_simulation = True
 
 # =============================================================================
-# CACHE DAS SIMULAÇÕES (IDÊNTICO AO ORIGINAL)
+# CACHE DAS SIMULAÇÕES (COM DOC_f FIXO)
 # =============================================================================
 @st.cache_data(show_spinner=False)
-def cached_sobol(n_samples, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
+def cached_sobol(n_samples, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o):
     problem = {'num_vars':3, 'names':['k','T','DOC'], 'bounds':[[0.06,0.40],[20,40],[0.10,0.25]]}
     param_values = sample(problem, n_samples, seed=50)
     calc = GHGEmissionCalculator()
     calc.GWP_CH4_20 = gwp_ch4
     calc.GWP_N2O_20 = gwp_n2o
     def f(p):
-        return calc.calculate_avoided_emissions_fast(w, p[0], p[1], p[2], umid, years)
+        return calc.calculate_avoided_emissions_fast(w, p[0], p[1], p[2], docf, umid, years)
     res = Parallel(n_jobs=-1)(delayed(f)(p) for p in param_values)
     arr_v = np.array([r[0] for r in res])
     arr_t = np.array([r[1] for r in res])
@@ -446,7 +467,7 @@ def cached_sobol(n_samples, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
     return Si_v, Si_t, Si_s
 
 @st.cache_data(show_spinner=False)
-def cached_montecarlo(n, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
+def cached_montecarlo(n, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o):
     np.random.seed(50)
     u = np.random.uniform(0.75, 0.90, n)
     t = np.random.normal(25, 3, n)
@@ -456,7 +477,7 @@ def cached_montecarlo(n, w, k, T, doc, umid, years, gwp_ch4, gwp_n2o):
     calc.GWP_N2O_20 = gwp_n2o
     def run(i):
         np.random.seed(50+i)
-        return calc.calculate_avoided_emissions_fast(w, k, t[i], d[i], u[i], years)
+        return calc.calculate_avoided_emissions_fast(w, k, t[i], d[i], docf, u[i], years)
     res = Parallel(n_jobs=-1)(delayed(run)(i) for i in range(n))
     arr_v = np.array([r[0] for r in res])
     arr_t = np.array([r[1] for r in res])
@@ -479,7 +500,7 @@ if st.session_state.get('run_simulation', False):
             calc = GHGEmissionCalculator()
             calc.GWP_CH4_20 = gwp_c
             calc.GWP_N2O_20 = gwp_n
-            results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao)
+            results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao)
         
         selected = st.session_state.selected_gwp
         res = results_all[selected]
@@ -509,6 +530,7 @@ if st.session_state.get('run_simulation', False):
         - k = {formatar_br(k_ano)} ano⁻¹  
         - Temperatura = {formatar_br(T)} °C  
         - DOC = {formatar_br(DOC)}  
+        - **DOC_f (Tabela 7 UNFCCC) = 0,7** (fixo para resíduos altamente decomponíveis – alimentos + grama/podas)  
         - Umidade = {formatar_br(umidade_valor)}%  
         - Resíduos totais = {formatar_br(residuos_kg_dia*365*anos_simulacao/1000)} t  
         - Baseline: captura de metano = 60%, φ = 0,85 (UNFCCC 2024)
@@ -616,7 +638,7 @@ if st.session_state.get('run_simulation', False):
         st.subheader(f"🎯 Análise de Sensibilidade Sobol ({selected})")
         with st.spinner("Sobol em execução..."):
             gwp_c, gwp_n = gwps[selected]
-            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, gwp_c, gwp_n)
+            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n)
         df_sens = pd.DataFrame({
             'Parâmetro': ['k','T','DOC'],
             'S1_Vermi': Si_v['S1'], 'ST_Vermi': Si_v['ST'],
@@ -641,7 +663,7 @@ if st.session_state.get('run_simulation', False):
         st.subheader(f"🎲 Monte Carlo e Testes Estatísticos ({selected})")
         with st.spinner("Monte Carlo em execução..."):
             gwp_c, gwp_n = gwps[selected]
-            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, umidade, anos_simulacao, gwp_c, gwp_n)
+            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n)
 
         fig3, ax3 = plt.subplots(figsize=(10,5))
         sns.kdeplot(arr_v, label='Vermicompostagem (Yang)', ax=ax3)
@@ -715,7 +737,8 @@ st.markdown("---")
 with st.expander("📚 Referências Metodológicas Detalhadas"):
     st.markdown("""
     **1. Baseline – Aterro Sanitário (Guatapará, Ribeirão Preto)**  
-    - **Modelo de metano (CH₄) – IPCC 2006**: Método FOD, parâmetros MCF=1,0; F=0,5; OX=0,1; k=0,06 ou 0,40 ano⁻¹; DOCf = 0,0147×T+0,28.  
+    - **Modelo de metano (CH₄) – IPCC 2006**: Método FOD, parâmetros MCF=1,0; F=0,5; OX=0,1; k=0,06 ou 0,40 ano⁻¹.  
+    - **DOC_f** – **Tabela 7 da UNFCCC A6.4‑AMT‑003 (2025)**: para resíduos altamente decomponíveis (alimentos, grama/podas) → 0,7.  
     - **Emissões de N₂O – Wang et al. (2017)**: E_open = 1,91 mg m⁻² h⁻¹; E_closed = 2,15 mg m⁻² h⁻¹.  
     - **Pré‑descarte – Feng et al. (2020)**: CH₄ = 2,78 μgC kg⁻¹ h⁻¹; N₂O total = 20,26 mg N kg⁻¹.  
     - **Fator φ – UNFCCC A6.4‑AMT‑003 (2024)**: para clima úmido, φ = 0,85.  
