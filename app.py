@@ -66,7 +66,9 @@ sns.set_style("whitegrid")
 # =============================================================================
 # PARÂMETROS GLOBAIS – BASELINE CALIBRADO PARA RIBEIRÃO PRETO (ATERRO GUATAPARÁ)
 # =============================================================================
-CAPTURE_FRACTION_BASELINE = 0.6      # 60% de captura de metano (usina de biogás)
+# NOTA: O parâmetro fy (captura de metano) FOI REMOVIDO daqui e agora é
+# definido dinamicamente pelo usuário na barra lateral, conforme exigido pela
+# UNFCCC A6.4-AMT-003 (2025), Data/Parameter table 10.
 MCF_BASELINE = 1.0
 OX_BASELINE = 0.1
 PHI_BASELINE = 0.85                  # Fator φ para clima úmido (UNFCCC 2024)
@@ -148,14 +150,18 @@ class GHGEmissionCalculator:
         self.N2O_pre_kg_per_kg_total = N2O_pre_kg_per_kg_total
 
     # -------------------------------------------------------------------------
-    # MÉTODO MODIFICADO: agora recebe 'docf' como parâmetro (Tabela 7 UNFCCC)
+    # MÉTODO MODIFICADO: agora recebe 'fy' (captura de metano) em vez de 'capt'
+    # Conforme UNFCCC A6.4-AMT-003 (2025), Equations (1) e (2), e Table 10.
     # -------------------------------------------------------------------------
-    def calculate_landfill_emissions(self, w, k, T, doc, docf, umid, years=20, phi=PHI_BASELINE, capt=CAPTURE_FRACTION_BASELINE):
+    def calculate_landfill_emissions(self, w, k, T, doc, docf, umid, years=20, phi=PHI_BASELINE, fy=0.0):
         """
         w: kg de resíduo por dia
         doc: fração de carbono orgânico degradável (total)
         docf: fração do DOC que realmente se decompõe (fixo em 0.7 para este projeto)
         T: temperatura média (°C) – não usado para docf, mantido para consistência
+        fy: fração de metano capturada e destruída (queimada/utilizada) – conforme A6.4-AMT-003, Table 10.
+            Para Application B (nosso caso): monitorado anualmente.
+            Para simulações ex-ante conservadoras, utilize 0.0.
         """
         days = years*365
         # DOCf agora é passado como argumento (fixo, não calculado linearmente)
@@ -163,7 +169,9 @@ class GHGEmissionCalculator:
         t = np.arange(1, days+1)
         kernel = np.exp(-k*(t-1)/365) - np.exp(-k*t/365)
         ch4 = np.convolve(np.ones(days), kernel, mode='full')[:days] * ch4_pot
-        ch4 = ch4 * phi * (1-capt)
+        # Aplicação do fator de correção climática e subtração da captura (fy)
+        # Conforme Equação (1) da A6.4-AMT-003: ... * (1 - fy)
+        ch4 = ch4 * phi * (1 - fy)
 
         # N2O do aterro (Wang et al.)
         opening_factor = min(1.0, (100/w)*(8/24))
@@ -230,8 +238,8 @@ class GHGEmissionCalculator:
                     n2o[ed] += n2o_batch * self.profile_n2o_vermi[d]
         return ch4, n2o
 
-    def calculate_avoided_emissions(self, w, k, T, doc, docf, umid, years):
-        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, docf, umid, years)
+    def calculate_avoided_emissions(self, w, k, T, doc, docf, umid, years, fy=0.0):
+        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, docf, umid, years, fy=fy)
         ch4_v, n2o_v = self.calculate_vermicomposting_emissions(w, umid, years)
         ch4_t, n2o_t = self.calculate_thermophilic_emissions(w, umid, years)
         ch4_s, n2o_s = self.calculate_standard_emissions(w, umid, years)
@@ -249,8 +257,8 @@ class GHGEmissionCalculator:
             'base_series': base, 'vermi_series': vermi, 'thermo_series': thermo, 'std_series': std
         }
 
-    def calculate_avoided_emissions_fast(self, w, k, T, doc, docf, umid, years):
-        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, docf, umid, years)
+    def calculate_avoided_emissions_fast(self, w, k, T, doc, docf, umid, years, fy=0.0):
+        ch4_l, n2o_l = self.calculate_landfill_emissions(w, k, T, doc, docf, umid, years, fy=fy)
         ch4_v, n2o_v = self.calculate_vermicomposting_emissions(w, umid, years)
         ch4_t, n2o_t = self.calculate_thermophilic_emissions(w, umid, years)
         ch4_s, n2o_s = self.calculate_standard_emissions(w, umid, years)
@@ -380,14 +388,16 @@ with st.container():
     st.markdown("""
     **📘 Nota metodológica:** A metodologia **AMS‑III.F** e sua ferramenta **TOOL13** (UNFCCC, 2017) fornecem fatores de emissão padrão para projetos de compostagem: **CH₄ = 0,002 t/t resíduo úmido** e **N₂O = 0,0002 t/t resíduo úmido**. Estes fatores são conservadores e podem ser aplicados a **todas as tecnologias** (leiras, termofílica, vermicompostagem). Neste simulador, para fins de comparação científica, utilizamos: **Fatores padrão UNFCCC** → aplicados a um cenário de compostagem em leiras aeradas; **Fatores experimentais de Yang et al. (2017)** → para vermicompostagem e compostagem termofílica. Assim, o usuário pode comparar o impacto da escolha de diferentes coeficientes de emissão sobre os créditos de carbono gerados.
 
-    **✅ Atualização:** O cálculo do **baseline (aterro)** agora utiliza o **DOC_f = 0,7** (fixo para resíduos altamente decomponíveis – alimentos e grama/podas), conforme **Tabela 7** da UNFCCC A6.4‑AMT‑003 (2025), substituindo a antiga fórmula empírica `0.0147*T + 0.28`. Os cenários de vermicompostagem e termofílica (Yang et al.) permanecem inalterados.
+    **✅ Atualizações:**  
+    1. O cálculo do **baseline (aterro)** agora utiliza o **DOC_f = 0,7** (fixo para resíduos altamente decomponíveis – alimentos e grama/podas), conforme **Tabela 7** da UNFCCC A6.4‑AMT‑003 (2025), substituindo a antiga fórmula empírica `0.0147*T + 0.28`.  
+    2. O parâmetro de **captura de metano** (`fy`) agora segue estritamente a **UNFCCC A6.4-AMT-003 (2025), Data/Parameter table 10**, sendo definido pelo usuário na barra lateral (padrão conservador = 0,0). Removida a constante fixa de 60% que não estava em conformidade com a norma.
     """)
     st.divider()
 
 exibir_cotacao_carbono()
 
 # =============================================================================
-# SIDEBAR COM PARÂMETROS (INCLUINDO OPÇÃO DE BOMBONAS E DOC_f FIXO)
+# SIDEBAR COM PARÂMETROS (INCLUINDO OPÇÃO DE BOMBONAS, DOC_f FIXO E fy)
 # =============================================================================
 with st.sidebar:
     st.header("⚙️ Parâmetros")
@@ -422,6 +432,33 @@ with st.sidebar:
     
     umidade_valor = st.slider("Umidade (%)", 50, 95, 85, 1)
     umidade = umidade_valor/100.0
+
+    # =====================================================================
+    # PARÂMETRO f_y CONFORME UNFCCC A6.4-AMT-003 (2025) – Application B
+    # Data/Parameter table 10
+    # =====================================================================
+    st.subheader("🏭 Captura de Metano no Aterro (fy)")
+    st.markdown("""
+    **`f_y`** = Fração do metano capturada e destruída (queimada, convertida em energia ou 
+    utilizada de outra forma que impeça a emissão para a atmosfera.
+    
+    - **Application A** (projetos existentes): estimado uma única vez com base em contratos ou dados históricos.
+    - **Application B** (nosso caso – desvio de resíduos): **monitorado anualmente**.
+    
+    ⚠️ **Para simulações ex-ante conservadoras, utilize 0,0** (assume que nenhum metano é capturado).
+    Utilize valores > 0 apenas se houver dados contratuais ou históricos comprovados do aterro de referência.
+    """)
+    fy = st.slider(
+        "Fração capturada e destruída (fy)",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.0,          # ← conservador! usuário pode ajustar
+        step=0.01,
+        format="%.2f",
+        help="Conforme Data/Parameter table 10 da A6.4-AMT-003. Para Application B, deve ser monitorado anualmente."
+    )
+    st.caption(f"Valor atual: **{fy:.2f}** ({fy*100:.0f}% de captura)")
+
     anos_simulacao = st.slider("Anos de simulação", 5, 50, 20, 5)
     n_simulations = st.slider("Monte Carlo (n)", 50, 1000, 100, 50)
     n_samples = st.slider("Sobol (amostras)", 32, 256, 64, 16)
@@ -446,17 +483,17 @@ with st.sidebar:
         st.session_state.run_simulation = True
 
 # =============================================================================
-# CACHE DAS SIMULAÇÕES (COM DOC_f FIXO)
+# CACHE DAS SIMULAÇÕES (COM DOC_f FIXO E fy)
 # =============================================================================
 @st.cache_data(show_spinner=False)
-def cached_sobol(n_samples, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o):
+def cached_sobol(n_samples, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o, fy):
     problem = {'num_vars':3, 'names':['k','T','DOC'], 'bounds':[[0.06,0.40],[20,40],[0.10,0.25]]}
     param_values = sample(problem, n_samples, seed=50)
     calc = GHGEmissionCalculator()
     calc.GWP_CH4_20 = gwp_ch4
     calc.GWP_N2O_20 = gwp_n2o
     def f(p):
-        return calc.calculate_avoided_emissions_fast(w, p[0], p[1], p[2], docf, umid, years)
+        return calc.calculate_avoided_emissions_fast(w, p[0], p[1], p[2], docf, umid, years, fy=fy)
     res = Parallel(n_jobs=-1)(delayed(f)(p) for p in param_values)
     arr_v = np.array([r[0] for r in res])
     arr_t = np.array([r[1] for r in res])
@@ -467,7 +504,7 @@ def cached_sobol(n_samples, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o):
     return Si_v, Si_t, Si_s
 
 @st.cache_data(show_spinner=False)
-def cached_montecarlo(n, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o):
+def cached_montecarlo(n, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o, fy):
     np.random.seed(50)
     u = np.random.uniform(0.75, 0.90, n)
     t = np.random.normal(25, 3, n)
@@ -477,7 +514,7 @@ def cached_montecarlo(n, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o):
     calc.GWP_N2O_20 = gwp_n2o
     def run(i):
         np.random.seed(50+i)
-        return calc.calculate_avoided_emissions_fast(w, k, t[i], d[i], docf, u[i], years)
+        return calc.calculate_avoided_emissions_fast(w, k, t[i], d[i], docf, u[i], years, fy=fy)
     res = Parallel(n_jobs=-1)(delayed(run)(i) for i in range(n))
     arr_v = np.array([r[0] for r in res])
     arr_t = np.array([r[1] for r in res])
@@ -500,7 +537,8 @@ if st.session_state.get('run_simulation', False):
             calc = GHGEmissionCalculator()
             calc.GWP_CH4_20 = gwp_c
             calc.GWP_N2O_20 = gwp_n
-            results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao)
+            # Passando o fy obtido da sidebar
+            results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, fy=fy)
         
         selected = st.session_state.selected_gwp
         res = results_all[selected]
@@ -532,8 +570,9 @@ if st.session_state.get('run_simulation', False):
         - DOC = {formatar_br(DOC)}  
         - **DOC_f (Tabela 7 UNFCCC) = 0,7** (fixo para resíduos altamente decomponíveis – alimentos + grama/podas)  
         - Umidade = {formatar_br(umidade_valor)}%  
+        - **f_y (captura de metano) = {formatar_br(fy)}** – conforme A6.4-AMT-003, Table 10 (Application B: monitorado anualmente)  
         - Resíduos totais = {formatar_br(residuos_kg_dia*365*anos_simulacao/1000)} t  
-        - Baseline: captura de metano = 60%, φ = 0,85 (UNFCCC 2024)
+        - Baseline: φ = 0,85 (UNFCCC 2024), OX = 0,1 (IPCC 2006)
         """)
 
         st.subheader("📊 Comparação entre todos os Cenários de GWP (tCO₂eq evitadas)")
@@ -638,7 +677,7 @@ if st.session_state.get('run_simulation', False):
         st.subheader(f"🎯 Análise de Sensibilidade Sobol ({selected})")
         with st.spinner("Sobol em execução..."):
             gwp_c, gwp_n = gwps[selected]
-            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n)
+            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n, fy)
         df_sens = pd.DataFrame({
             'Parâmetro': ['k','T','DOC'],
             'S1_Vermi': Si_v['S1'], 'ST_Vermi': Si_v['ST'],
@@ -663,7 +702,7 @@ if st.session_state.get('run_simulation', False):
         st.subheader(f"🎲 Monte Carlo e Testes Estatísticos ({selected})")
         with st.spinner("Monte Carlo em execução..."):
             gwp_c, gwp_n = gwps[selected]
-            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n)
+            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n, fy)
 
         fig3, ax3 = plt.subplots(figsize=(10,5))
         sns.kdeplot(arr_v, label='Vermicompostagem (Yang)', ax=ax3)
@@ -742,7 +781,7 @@ with st.expander("📚 Referências Metodológicas Detalhadas"):
     - **Emissões de N₂O – Wang et al. (2017)**: E_open = 1,91 mg m⁻² h⁻¹; E_closed = 2,15 mg m⁻² h⁻¹.  
     - **Pré‑descarte – Feng et al. (2020)**: CH₄ = 2,78 μgC kg⁻¹ h⁻¹; N₂O total = 20,26 mg N kg⁻¹.  
     - **Fator φ – UNFCCC A6.4‑AMT‑003 (2024)**: para clima úmido, φ = 0,85.  
-    - **Captura de metano**: 60% (dado real do Aterro Guatapará).  
+    - **f_y (captura de metano) – UNFCCC A6.4‑AMT‑003 (2025), Data/Parameter table 10**: definido pelo usuário (padrão conservador 0,0). Para Application B, deve ser monitorado anualmente.
 
     **2. Tecnologias de compostagem**  
     - **Fatores padrão UNFCCC (AMS‑III.F / TOOL13)**: CH₄ = 0,002 t/t úmido; N₂O = 0,0002 t/t úmido.  
