@@ -66,16 +66,19 @@ sns.set_style("whitegrid")
 # =============================================================================
 # PARÂMETROS GLOBAIS – BASELINE CALIBRADO PARA RIBEIRÃO PRETO (ATERRO GUATAPARÁ)
 # =============================================================================
-# NOTA: O parâmetro fy (captura de metano) FOI REMOVIDO daqui e agora é
-# definido dinamicamente pelo usuário na barra lateral, conforme exigido pela
-# UNFCCC A6.4-AMT-003 (2025), Data/Parameter table 10.
 MCF_BASELINE = 1.0
 OX_BASELINE = 0.1
 PHI_BASELINE = 0.85                  # Fator φ para clima úmido (UNFCCC 2024)
 
 # Fatores de emissão padrão da metodologia UNFCCC (AMS‑III.F / TOOL13)
 EF_CH4_STD = 0.002      # t CH₄ / t resíduo úmido  → 0.002 kg CH₄ / kg resíduo
-EF_N2O_STD = 0.0002     # t N₂O / t resíduo úmido  → 0.0002 kg N₂O / kg resíduo (CORRIGIDO)
+EF_N2O_STD = 0.0002     # t N₂O / t resíduo úmido  → 0.0002 kg N₂O / kg resíduo
+
+# =============================================================================
+# GWP FIXO – IPCC AR5 (CONFORME UNFCCC A6.4-AMT-003)
+# =============================================================================
+GWP_CH4 = 28.0
+GWP_N2O = 265.0
 
 # Parâmetros fixos baseados na literatura (Yang et al. 2017)
 TOC = 0.436
@@ -85,8 +88,6 @@ F_N2O_VERMI = 0.0092
 F_CH4_THERMO = 0.0060
 F_N2O_THERMO = 0.0196
 COMPOSTING_DAYS = 50
-GWP_CH4_20 = 79.7
-GWP_N2O_20 = 273
 
 # =============================================================================
 # PERFIS DE EMISSÃO DIÁRIOS
@@ -121,7 +122,7 @@ N2O_pre_mgN_per_kg_total = 20.26
 N2O_pre_kg_per_kg_total = N2O_pre_mgN_per_kg_total * (44/28) / 1_000_000
 
 # =============================================================================
-# CLASSE DE CÁLCULO (CORRIGIDA – DOCf fixo baseado na Tabela 7 UNFCCC)
+# CLASSE DE CÁLCULO (CORRIGIDA – GWP FIXO, DOCf FIXO E fy DINÂMICO)
 # =============================================================================
 class GHGEmissionCalculator:
     def __init__(self):
@@ -134,8 +135,9 @@ class GHGEmissionCalculator:
         self.EF_CH4_std = EF_CH4_STD
         self.EF_N2O_std = EF_N2O_STD
         self.COMPOSTING_DAYS = COMPOSTING_DAYS
-        self.GWP_CH4_20 = GWP_CH4_20
-        self.GWP_N2O_20 = GWP_N2O_20
+        # GWP fixos (IPCC AR5)
+        self.GWP_CH4_20 = GWP_CH4
+        self.GWP_N2O_20 = GWP_N2O
         self.MCF = MCF_BASELINE
         self.F = 0.5
         self.OX = OX_BASELINE
@@ -373,8 +375,6 @@ def inicializar_session_state():
         st.session_state.run_simulation = False
     if 'k_ano' not in st.session_state:
         st.session_state.k_ano = 0.06
-    if 'selected_gwp' not in st.session_state:
-        st.session_state.selected_gwp = "Otimista (GWP-20)"
 
 inicializar_session_state()
 
@@ -391,6 +391,8 @@ with st.container():
     **✅ Atualizações:**  
     1. O cálculo do **baseline (aterro)** agora utiliza o **DOC_f = 0,7** (fixo para resíduos altamente decomponíveis – alimentos e grama/podas), conforme **Tabela 7** da UNFCCC A6.4‑AMT‑003 (2025), substituindo a antiga fórmula empírica `0.0147*T + 0.28`.  
     2. O parâmetro de **captura de metano** (`fy`) agora segue estritamente a **UNFCCC A6.4-AMT-003 (2025), Data/Parameter table 10**, sendo definido pelo usuário na barra lateral (padrão conservador = 0,0). Removida a constante fixa de 60% que não estava em conformidade com a norma.
+    3. **GWP fixo**: CH₄ = 28,0 e N₂O = 265,0 (IPCC AR5), conforme exigido pela metodologia.
+    4. A **eficiência de captura (`fy`)** foi incluída como variável de incerteza nas análises de Sobol e Monte Carlo (distribuição uniforme 0–0,8), substituindo a variabilidade do GWP.
     """)
     st.divider()
 
@@ -452,7 +454,7 @@ with st.sidebar:
         "Fração capturada e destruída (fy)",
         min_value=0.0,
         max_value=1.0,
-        value=0.0,          # ← conservador! usuário pode ajustar
+        value=0.0,
         step=0.01,
         format="%.2f",
         help="Conforme Data/Parameter table 10 da A6.4-AMT-003. Para Application B, deve ser monitorado anualmente."
@@ -463,37 +465,19 @@ with st.sidebar:
     n_simulations = st.slider("Monte Carlo (n)", 50, 1000, 100, 50)
     n_samples = st.slider("Sobol (amostras)", 32, 256, 64, 16)
     
-    st.subheader("🎯 Cenário de GWP para Resultados Principais")
-    st.markdown("""
-    O **Potencial de Aquecimento Global (GWP)** define o peso do metano (CH₄) e do óxido nitroso (N₂O) em equivalente CO₂. A escolha do cenário altera significativamente as emissões evitadas e o valor dos créditos de carbono.
-    """)
-    gwp_option = st.radio(
-        "Selecione o cenário:",
-        ["Otimista (GWP-20)", "Realista (GWP-100)", "Pessimista (GWP-500)"],
-        index=0,
-        help="""
-        - **Otimista (GWP-20)**: Fatores altos (CH₄=79,7; N₂O=273). Gera as maiores emissões evitadas. Recomendado para projetos que buscam maximizar créditos em horizonte de curto prazo (20 anos).
-        - **Realista (GWP-100)**: Padrão mais aceito internacionalmente (CH₄=27,0; N₂O=273). Equilibra precisão e aceitação regulatória.
-        - **Pessimista (GWP-500)**: Fatores baixos (CH₄=7,2; N₂O=130). Resulta nas menores emissões evitadas. Visão de longo prazo (500 anos) ou para metodologias conservadoras.
-        """
-    )
-    st.session_state.selected_gwp = gwp_option
-    
     if st.button("🚀 Executar Simulação", type="primary"):
         st.session_state.run_simulation = True
 
 # =============================================================================
-# CACHE DAS SIMULAÇÕES (COM DOC_f FIXO E fy)
+# CACHE DAS SIMULAÇÕES (COM DOC_f FIXO E fy COMO VARIÁVEL)
 # =============================================================================
 @st.cache_data(show_spinner=False)
-def cached_sobol(n_samples, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o, fy):
-    problem = {'num_vars':3, 'names':['k','T','DOC'], 'bounds':[[0.06,0.40],[20,40],[0.10,0.25]]}
+def cached_sobol(n_samples, w, k, T, doc, docf, umid, years, fy_bound=[0.0, 0.8]):
+    problem = {'num_vars':4, 'names':['k','T','DOC','fy'], 'bounds':[[0.06,0.40],[20,40],[0.10,0.25], fy_bound]}
     param_values = sample(problem, n_samples, seed=50)
     calc = GHGEmissionCalculator()
-    calc.GWP_CH4_20 = gwp_ch4
-    calc.GWP_N2O_20 = gwp_n2o
     def f(p):
-        return calc.calculate_avoided_emissions_fast(w, p[0], p[1], p[2], docf, umid, years, fy=fy)
+        return calc.calculate_avoided_emissions_fast(w, p[0], p[1], p[2], docf, umid, years, fy=p[3])
     res = Parallel(n_jobs=-1)(delayed(f)(p) for p in param_values)
     arr_v = np.array([r[0] for r in res])
     arr_t = np.array([r[1] for r in res])
@@ -504,17 +488,16 @@ def cached_sobol(n_samples, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o, f
     return Si_v, Si_t, Si_s
 
 @st.cache_data(show_spinner=False)
-def cached_montecarlo(n, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o, fy):
+def cached_montecarlo(n, w, k, T, doc, docf, umid, years):
     np.random.seed(50)
     u = np.random.uniform(0.75, 0.90, n)
     t = np.random.normal(25, 3, n)
     d = np.random.triangular(0.12, 0.15, 0.18, n)
+    fy_samples = np.random.uniform(0.0, 0.8, n)
     calc = GHGEmissionCalculator()
-    calc.GWP_CH4_20 = gwp_ch4
-    calc.GWP_N2O_20 = gwp_n2o
     def run(i):
         np.random.seed(50+i)
-        return calc.calculate_avoided_emissions_fast(w, k, t[i], d[i], docf, u[i], years, fy=fy)
+        return calc.calculate_avoided_emissions_fast(w, k, t[i], d[i], docf, u[i], years, fy=fy_samples[i])
     res = Parallel(n_jobs=-1)(delayed(run)(i) for i in range(n))
     arr_v = np.array([r[0] for r in res])
     arr_t = np.array([r[1] for r in res])
@@ -526,22 +509,9 @@ def cached_montecarlo(n, w, k, T, doc, docf, umid, years, gwp_ch4, gwp_n2o, fy):
 # =============================================================================
 if st.session_state.get('run_simulation', False):
     with st.spinner("Executando simulação..."):
-        gwps = {
-            "Otimista (GWP-20)": (79.7, 273),
-            "Realista (GWP-100)": (27.0, 273),
-            "Pessimista (GWP-500)": (7.2, 130)
-        }
-        
-        results_all = {}
-        for nome, (gwp_c, gwp_n) in gwps.items():
-            calc = GHGEmissionCalculator()
-            calc.GWP_CH4_20 = gwp_c
-            calc.GWP_N2O_20 = gwp_n
-            # Passando o fy obtido da sidebar
-            results_all[nome] = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, fy=fy)
-        
-        selected = st.session_state.selected_gwp
-        res = results_all[selected]
+        # Instancia calculadora com GWP fixo
+        calc = GHGEmissionCalculator()
+        res = calc.calculate_avoided_emissions(residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, fy=fy)
         
         base_series = res['base_series']
         vermi_series = res['vermi_series']
@@ -562,7 +532,7 @@ if st.session_state.get('run_simulation', False):
         termo_acum = np.cumsum(termo_series)
         std_acum = np.cumsum(std_series)
 
-        st.header(f"📈 Resultados da Simulação - {selected}")
+        st.header(f"📈 Resultados da Simulação (GWP AR5 – CH₄=28 | N₂O=265)")
         st.info(f"""
         **Parâmetros – Ribeirão Preto (Aterro Guatapará):**  
         - k = {formatar_br(k_ano)} ano⁻¹  
@@ -575,25 +545,7 @@ if st.session_state.get('run_simulation', False):
         - Baseline: φ = 0,85 (UNFCCC 2024), OX = 0,1 (IPCC 2006)
         """)
 
-        st.subheader("📊 Comparação entre todos os Cenários de GWP (tCO₂eq evitadas)")
-        comp = []
-        for nome, r in results_all.items():
-            comp.append({"Cenário": nome,
-                         "Vermicompostagem (Yang et al.)": r['vermi_avoided'],
-                         "Termofílica (Yang et al.)": r['thermo_avoided'],
-                         "Fatores Padrão UNFCCC (TOOL13)": r['std_avoided']})
-        df_comp = pd.DataFrame(comp)
-        st.dataframe(df_comp.style.format({c: lambda x: formatar_br(x) for c in df_comp.columns if c != "Cenário"}))
-        
-        st.info("""
-        **🔍 Interpretação dos cenários de GWP:**  
-        - **Otimista (GWP-20)**: destaca o impacto de curto prazo do metano (79,7x CO₂eq) – resulta nas maiores emissões evitadas.  
-        - **Realista (GWP-100)**: padrão mais comum em inventários nacionais (27,0x CO₂eq).  
-        - **Pessimista (GWP-500)**: reduz drasticamente o peso do metano (7,2x CO₂eq), aproximando-se de uma visão de longo prazo.  
-        - Independentemente do cenário, a **vermicompostagem apresenta as maiores reduções**, seguida pela termofílica e depois pelos fatores padrão UNFCCC.
-        """)
-
-        st.subheader(f"💰 Valor Financeiro ({selected})")
+        st.subheader(f"💰 Valor Financeiro (GWP Fixo – AR5)")
         preco = st.session_state.preco_carbono
         moeda = st.session_state.moeda_carbono
         cambio = st.session_state.taxa_cambio
@@ -626,7 +578,7 @@ if st.session_state.get('run_simulation', False):
         - Para cada tonelada de resíduo tratado, o retorno financeiro apenas com créditos de carbono (sem custos operacionais) é de **{moeda} {formatar_br((v_vermi*preco)/(residuos_kg_dia*365*anos_simulacao/1000))} por t**.
         """)
 
-        st.subheader(f"📊 Comparação Anual das Emissões Evitadas ({selected})")
+        st.subheader(f"📊 Comparação Anual das Emissões Evitadas")
         fig, ax = plt.subplots(figsize=(12,6))
         x = np.arange(len(df_anual['Year']))
         width = 0.25
@@ -640,7 +592,7 @@ if st.session_state.get('run_simulation', False):
         ax.set_xticks(x)
         ax.set_xticklabels(df_anual['Year'])
         ax.set_ylabel('tCO₂eq evitadas')
-        ax.set_title(f'Emissões Evitadas por Ano - {selected}')
+        ax.set_title(f'Emissões Evitadas por Ano (GWP AR5 – CH₄=28 | N₂O=265)')
         ax.legend()
         ax.yaxis.set_major_formatter(FuncFormatter(br_format))
         st.pyplot(fig)
@@ -651,14 +603,14 @@ if st.session_state.get('run_simulation', False):
         As emissões evitadas crescem ano a ano devido ao acúmulo de resíduos e à dinâmica de degradação do aterro (modelo FOD). Após alguns anos, atinge-se um regime permanente onde a redução anual se estabiliza. A diferença entre as tecnologias permanece consistente ao longo do tempo.
         """)
 
-        st.subheader(f"📉 Emissões Acumuladas (Baseline vs Tecnologias) - {selected}")
+        st.subheader(f"📉 Emissões Acumuladas (Baseline vs Tecnologias)")
         fig2, ax2 = plt.subplots(figsize=(11,6))
         ax2.plot(datas, base_acum, 'r-', label='Baseline (Aterro)')
         ax2.plot(datas, vermi_acum, 'g-', label='Vermicompostagem (Yang)')
         ax2.plot(datas, termo_acum, 'orange', label='Termofílica (Yang)')
         ax2.plot(datas, std_acum, 'steelblue', label='Fatores Padrão UNFCCC')
         ax2.fill_between(datas, vermi_acum, base_acum, alpha=0.3, color='lightgreen')
-        ax2.set_title(f'Emissões Acumuladas – {anos_simulacao} anos (k={formatar_br(k_ano)} ano⁻¹) - {selected}')
+        ax2.set_title(f'Emissões Acumuladas – {anos_simulacao} anos (k={formatar_br(k_ano)} ano⁻¹)')
         ax2.set_xlabel('Data')
         ax2.set_ylabel('tCO₂eq')
         ax2.legend()
@@ -674,12 +626,11 @@ if st.session_state.get('run_simulation', False):
         - A área verde no gráfico representa exatamente as emissões evitadas pela vermicompostagem.
         """)
 
-        st.subheader(f"🎯 Análise de Sensibilidade Sobol ({selected})")
+        st.subheader(f"🎯 Análise de Sensibilidade Sobol (com fy como variável)")
         with st.spinner("Sobol em execução..."):
-            gwp_c, gwp_n = gwps[selected]
-            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n, fy)
+            Si_v, Si_t, Si_s = cached_sobol(n_samples, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao)
         df_sens = pd.DataFrame({
-            'Parâmetro': ['k','T','DOC'],
+            'Parâmetro': ['k','T','DOC','fy'],
             'S1_Vermi': Si_v['S1'], 'ST_Vermi': Si_v['ST'],
             'S1_Termo': Si_t['S1'], 'ST_Termo': Si_t['ST'],
             'S1_Std': Si_s['S1'], 'ST_Std': Si_s['ST']
@@ -696,19 +647,19 @@ if st.session_state.get('run_simulation', False):
         - **DOC** (carbono orgânico degradável) é o parâmetro mais influente em todas as tecnologias (ST > 0,6).  
         - **Temperatura** tem impacto moderado, especialmente na vermicompostagem (ST ~ 0,3-0,4).  
         - **Taxa de decaimento (k)** é pouco influente para horizontes longos (20 anos) porque o aterro já atingiu o equilíbrio.  
+        - A **eficiência de captura (fy)** mostra influência variável, destacando a importância de monitorar esse parâmetro.
         - Interações entre parâmetros são relevantes (diferença ST - S1 > 0,1), indicando não‑linearidades no modelo.
         """)
 
-        st.subheader(f"🎲 Monte Carlo e Testes Estatísticos ({selected})")
+        st.subheader(f"🎲 Monte Carlo e Testes Estatísticos (com fy variável)")
         with st.spinner("Monte Carlo em execução..."):
-            gwp_c, gwp_n = gwps[selected]
-            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao, gwp_c, gwp_n, fy)
+            arr_v, arr_t, arr_s = cached_montecarlo(n_simulations, residuos_kg_dia, k_ano, T, DOC, DOC_f, umidade, anos_simulacao)
 
         fig3, ax3 = plt.subplots(figsize=(10,5))
         sns.kdeplot(arr_v, label='Vermicompostagem (Yang)', ax=ax3)
         sns.kdeplot(arr_t, label='Termofílica (Yang)', ax=ax3)
         sns.kdeplot(arr_s, label='Fatores Padrão UNFCCC', ax=ax3)
-        ax3.set_title(f'Distribuição das Emissões Evitadas - {selected}')
+        ax3.set_title(f'Distribuição das Emissões Evitadas (GWP AR5 – CH₄=28 | N₂O=265)')
         ax3.set_xlabel('tCO₂eq')
         ax3.xaxis.set_major_formatter(FuncFormatter(br_format))
         st.pyplot(fig3)
@@ -770,7 +721,7 @@ if st.session_state.get('run_simulation', False):
 
     st.session_state.run_simulation = False
 else:
-    st.info("💡 Ajuste os parâmetros na barra lateral, selecione o cenário de GWP desejado e clique em **Executar Simulação** para ver os resultados.")
+    st.info("💡 Ajuste os parâmetros na barra lateral e clique em **Executar Simulação** para ver os resultados.")
 
 st.markdown("---")
 with st.expander("📚 Referências Metodológicas Detalhadas"):
@@ -781,14 +732,15 @@ with st.expander("📚 Referências Metodológicas Detalhadas"):
     - **Emissões de N₂O – Wang et al. (2017)**: E_open = 1,91 mg m⁻² h⁻¹; E_closed = 2,15 mg m⁻² h⁻¹.  
     - **Pré‑descarte – Feng et al. (2020)**: CH₄ = 2,78 μgC kg⁻¹ h⁻¹; N₂O total = 20,26 mg N kg⁻¹.  
     - **Fator φ – UNFCCC A6.4‑AMT‑003 (2024)**: para clima úmido, φ = 0,85.  
-    - **f_y (captura de metano) – UNFCCC A6.4‑AMT‑003 (2025), Data/Parameter table 10**: definido pelo usuário (padrão conservador 0,0). Para Application B, deve ser monitorado anualmente.
+    - **f_y (captura de metano) – UNFCCC A6.4‑AMT‑003 (2025), Data/Parameter table 10**: definido pelo usuário (padrão conservador 0,0). Para Application B, deve ser monitorado anualmente.  
+    - **GWP – IPCC AR5 (UNFCCC A6.4‑AMT‑003)**: CH₄ = 28,0; N₂O = 265,0.
 
     **2. Tecnologias de compostagem**  
     - **Fatores padrão UNFCCC (AMS‑III.F / TOOL13)**: CH₄ = 0,002 t/t úmido; N₂O = 0,0002 t/t úmido.  
     - **Fatores Yang et al. (2017)**: Vermicompostagem (CH₄ = 0,0013 t/tC; N₂O = 0,0092 t/tN); Termofílica (CH₄ = 0,0060 t/tC; N₂O = 0,0196 t/tN).  
 
-    **3. Potencial de Aquecimento Global (GWP)**  
-    - Forster et al. (2021) IPCC AR6: GWP-20 (CH₄=79,7; N₂O=273); GWP-100 (27,0;273); GWP-500 (7,2;130).  
+    **3. Análise de Incerteza**  
+    - A variável **`fy`** (captura de metano) foi incluída como parâmetro de incerteza nas análises de Sobol e Monte Carlo, com distribuição uniforme [0,0 – 0,8], substituindo a variabilidade do GWP (agora fixo).
 
     **⚠️ Reprodutibilidade:** Seed fixa (50) e paralelização com joblib.
     """)
